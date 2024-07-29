@@ -11,7 +11,7 @@ class SamplePolicy(Policy):
 
     def compute_action(self, obs, prev_action, prev_hidden_state, **kwargs):
         act = random.randint(0, self.act_size - 1)
-        return act
+        return act, []
 
     def learn(self, samples: sample_batch.SampleBatch):
         pass

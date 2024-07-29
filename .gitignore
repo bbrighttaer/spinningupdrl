@@ -2,3 +2,5 @@ exp_results
 .venv
 *.ipynb
 .idea
+*.pyx
+*.pyc

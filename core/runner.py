@@ -34,7 +34,7 @@ class Runner:
         algo = self.cmd_args.algo
 
         # get default configs of the algorithm and update using cmd args
-        default_configs = importlib.import_module(f"config.{algo}")
+        default_configs = importlib.import_module(f"config.{algo}_config")
         running_config = default_configs.RUNNING_CONFIG
         running_config["device"] = self.device
         running_config = utils.DotDic(utils.update_dict(running_config, self.cmd_args.__dict__))

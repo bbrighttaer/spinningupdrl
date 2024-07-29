@@ -4,9 +4,10 @@ import numpy as np
 
 from core.buffer.episode import Episode
 from core.buffer.sample_batch import SampleBatch
+from core.proto.replay_buffer_proto import ReplayBuffer as ReplayBufferProto
 
 
-class ReplayBuffer:
+class ReplayBuffer(ReplayBufferProto):
     """
     Simple replay buffer to store and sample experiences.
     """
@@ -32,7 +33,7 @@ class ReplayBuffer:
             episode_padded = episode.pad_episode(max_len - len(episode))
             padded_sample_episodes.append(episode_padded)
 
-        sample_batch = SampleBatch(sampled_episodes)
+        sample_batch = SampleBatch(batch=padded_sample_episodes)
         return sample_batch
 
     def __len__(self):

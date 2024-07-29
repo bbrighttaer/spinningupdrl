@@ -7,6 +7,8 @@ ALGO_CONFIG = {
     "epsilon": 1.0,
     "epsilon_time_steps": 50,
     "final_epsilon": 0.01,
+    "training_batch_size": 10,
+    "num_steps_to_training": 10,
 }
 MODEL_CONFIG = {
     "core_arch": "mlp",

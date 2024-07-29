@@ -2,8 +2,10 @@ import copy
 
 import numpy as np
 
+from core.proto.episode_proto import Episode as EpisodeProto
 
-class Episode:
+
+class Episode(EpisodeProto):
     """
     Houses the experiences within a trajectory
     """
@@ -19,7 +21,7 @@ class Episode:
         self.prev_action = []
         self.mask = []
 
-    def add(self, obs, act, reward, next_obs, done, state, next_state, prev_action, mask=0):
+    def add(self, obs, act, reward, next_obs, done, state, next_state, prev_action, mask=False):
         """
         Adds an episode record.
 
@@ -35,15 +37,18 @@ class Episode:
         :param prev_action: action_{t-1}
         :param mask: whether this record is a padding
         """
-        self.obs.append(obs)
-        self.action.append([act])
-        self.reward.append([reward])
-        self.next_obs.append(next_obs)
-        self.done.append([done])
-        self.state.append(state)
-        self.next_state.append(next_state)
-        self.prev_action.append([prev_action])
-        self.mask.append([mask])
+        def wrap(obj):
+            return obj if isinstance(obj, np.ndarray) or isinstance(obj, list) else [obj]
+
+        self.obs.append(wrap(obs))
+        self.action.append(wrap(act))
+        self.reward.append(wrap(reward))
+        self.next_obs.append(wrap(next_obs))
+        self.done.append(wrap(done))
+        self.state.append(wrap(state))
+        self.next_state.append(wrap(next_state))
+        self.prev_action.append(wrap(prev_action))
+        self.mask.append(wrap(mask))
 
     def __len__(self):
         return len(self.obs)
@@ -70,22 +75,27 @@ class Episode:
                 state=np.zeros_like(state),
                 next_state=np.zeros_like(state),
                 prev_action=0,
-                mask=1
+                mask=True,
             )
         return ep_copy
 
-    def deflate(self) -> 'Episode':
+    def merge_time_steps(self) -> 'Episode':
+        """
+        Merge all episode steps into a single into a single batch.
+
+        :return: Episode with a single batch entry for each property.
+        """
         episode = Episode()
         episode.add(
-            obs=np.concatenate(self.obs),
-            act=np.concatenate(self.action),
-            reward=np.concatenate(self.reward),
-            next_obs=np.concatenate(self.next_obs),
-            done=np.concatenate(self.done),
-            state=np.concatenate(self.state),
-            next_state=np.concatenate(self.next_state),
-            prev_action=np.concatenate(self.prev_action),
-            mask=np.concatenate(self.mask),
+            obs=np.stack(self.obs),
+            act=np.stack(self.action),
+            reward=np.stack(self.reward),
+            next_obs=np.stack(self.next_obs),
+            done=np.stack(self.done),
+            state=np.stack(self.state),
+            next_state=np.stack(self.next_state),
+            prev_action=np.stack(self.prev_action),
+            mask=np.stack(self.mask),
         )
         return episode
 
