@@ -22,7 +22,6 @@ class SingleAgentTrainingWorker(TrainingWorker):
         self.callback = callback
 
     def train(self, time_step: int):
-        running_config = self.config[constants.RUNNING_CONFIG]
         algo_config = self.config[constants.ALGO_CONFIG]
 
         # Train after `num_steps_to_training` time steps
@@ -34,5 +33,8 @@ class SingleAgentTrainingWorker(TrainingWorker):
 
         # Train using samples
         stats = self.policy.learn(samples)
+
+        # Replay buffer callback (e.g. on-policy buffer can be cleared at this state)
+        self.replay.on_learning_completed()
 
         # Logging

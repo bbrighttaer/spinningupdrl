@@ -14,4 +14,4 @@ class SamplePolicy(Policy):
         return act, []
 
     def learn(self, samples: sample_batch.SampleBatch):
-        pass
+        return {}

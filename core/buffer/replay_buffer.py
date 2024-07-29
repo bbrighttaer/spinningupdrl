@@ -9,7 +9,7 @@ from core.proto.replay_buffer_proto import ReplayBuffer as ReplayBufferProto
 
 class ReplayBuffer(ReplayBufferProto):
     """
-    Simple replay buffer to store and sample experiences.
+    Simple off-policy replay buffer to store and sample experiences.
     """
 
     def __init__(self, capacity: int):
@@ -21,8 +21,8 @@ class ReplayBuffer(ReplayBufferProto):
             self._buffer.pop(0)
         self._buffer.append(episode)
 
-    def clear(self):
-        self._buffer.clear()
+    def on_learning_completed(self):
+        ...
 
     def sample(self, batch_size: int) -> SampleBatch:
         batch_size = min(batch_size, len(self._buffer))
