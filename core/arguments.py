@@ -40,7 +40,7 @@ def cmd_arguments():
     )
 
     parser.add_argument(
-        "--total_time_steps",
+        "--total_timesteps",
         type=int,
         default=100000,
         help="Total number of time steps of the experiment."

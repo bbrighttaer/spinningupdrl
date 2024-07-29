@@ -31,11 +31,16 @@ class SimpleRolloutWorker(RolloutWorker):
         self.summary_writer = summary_writer
         self.logger = logger
         self.callback = callback
-        self._time_step = 0
+        self._timestep = 0
         self.env = gym.make(**self.config[constants.ENV_CONFIG])
 
-    def get_global_time_step(self):
-        return self._time_step
+    @property
+    def timestep(self):
+        return self._timestep
+
+    def _increment_timestep(self):
+        self._timestep += 1
+        self.policy.on_global_timestep_update(self._timestep)
 
     def generate_trajectory(self):
         obs, info = self.env.reset()
@@ -50,6 +55,7 @@ class SimpleRolloutWorker(RolloutWorker):
                 obs=obs.reshape(-1, 1),
                 prev_action=prev_act,
                 prev_hidden_state=prev_hidden_state,
+                explore=True,
             )
             next_obs, reward, done, truncated, info = self.env.step(action)
 
@@ -71,6 +77,9 @@ class SimpleRolloutWorker(RolloutWorker):
             state = next_state
             prev_act = action
             prev_hidden_state = hidden_state
+
+            # update global time step and trigger related callbacks
+            self._increment_timestep()
 
         self.replay_buffer.add(episode)
 

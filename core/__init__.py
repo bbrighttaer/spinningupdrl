@@ -1,0 +1,3 @@
+
+FLOAT_MIN = -3.4e38
+FLOAT_MAX = 3.4e38

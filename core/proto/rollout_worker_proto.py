@@ -3,8 +3,9 @@ from typing import Protocol
 
 class RolloutWorker(Protocol):
 
-    def get_global_time_step(self):
-        ...
+    @property
+    def timestep(self):
+        return 0
 
     def generate_trajectory(self):
         ...

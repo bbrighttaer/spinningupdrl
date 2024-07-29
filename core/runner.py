@@ -38,7 +38,9 @@ class Runner:
         running_config = default_configs.RUNNING_CONFIG
         running_config["device"] = self.device
         running_config = utils.DotDic(utils.update_dict(running_config, self.cmd_args.__dict__))
-        algo_config = utils.DotDic(utils.update_dict(default_configs.ALGO_CONFIG, self.cmd_args.__dict__))
+        algo_config = utils.update_dict(default_configs.ALGO_CONFIG, self.cmd_args.__dict__)
+        algo_config["algo"] = algo
+        algo_config = utils.DotDic(algo_config)
         model_config = utils.DotDic(utils.update_dict(default_configs.MODEL_CONFIG, self.cmd_args.__dict__))
         env_config = utils.DotDic(utils.update_dict(default_configs.ENV_CONFIG, self.cmd_args.__dict__))
         config = {
@@ -85,9 +87,9 @@ class Runner:
             )
 
             # training loop
-            while rollout_worker.get_global_time_step() < self.cmd_args.total_time_steps:
+            while rollout_worker.timestep < self.cmd_args.total_timesteps:
                 # check for evaluation step
-                time_step = rollout_worker.get_global_time_step()
+                time_step = rollout_worker.timestep
                 if time_step > 0 and time_step % self.cmd_args.evaluation_interval == 0:
                     rollout_worker.evaluate_policy(self.cmd_args.evaluation_num_episodes)
 

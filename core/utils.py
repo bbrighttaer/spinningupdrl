@@ -1,7 +1,10 @@
 import copy
+import datetime
 import random
 import string
-import datetime
+
+import numpy as np
+import torch.nn
 
 
 class DotDic(dict):
@@ -43,3 +46,59 @@ def generate_random_label(length=4):
     now = datetime.datetime.now()
     rand_lbl += "_" + "".join([str(v) for v in [now.year, now.month, now.day, now.hour, now.minute, now.second]])
     return rand_lbl
+
+
+def get_activation_function(name: str):
+    return {
+        "relu": torch.nn.ReLU,
+        "tanh": torch.nn.Tanh,
+        "sigmoid": torch.nn.Sigmoid,
+        "leaky_relu": torch.nn.LeakyReLU,
+    }[name.lower()]
+
+
+def soft_update(target_net, source_net, tau):
+    """
+    Soft update the parameters of the target network with those of the source network.
+
+    Args:
+    - target_net: Target network.
+    - source_net: Source network.
+    - tau: Soft update parameter (0 < tau <= 1).
+
+    Returns:
+    - target_net: Updated target network.
+    """
+    for target_param, source_param in zip(target_net.parameters(), source_net.parameters()):
+        target_param.data.copy_(tau * source_param.data + (1.0 - tau) * target_param.data)
+
+    return target_net
+
+
+def linear_interpolation(left_value: float, right_value: float, alpha: float) -> float:
+    """
+    Linearly interpolates between two values.
+
+    Arguments
+    ------------
+    :param left_value: The value at the left endpoint (float).
+    :param right_value: The value at the right endpoint (float).
+    :param alpha: The interpolation parameter, where 0.0 corresponds to the left value
+                  and 1.0 corresponds to the right value (float).
+    :return: The interpolated value (float).
+    """
+    return left_value + alpha * (right_value - left_value)
+
+
+def convert_to_tensor(x, device=None):
+    if torch.is_tensor(x):
+        return x.to(device) if device else x
+
+    if isinstance(x, np.ndarray):
+        if x.dtype == np.object_:
+            return x
+        return torch.from_numpy(x)
+
+
+def to_numpy(tensor):
+    return tensor.cpu().detach().numpy()
