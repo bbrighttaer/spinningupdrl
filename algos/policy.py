@@ -1,7 +1,10 @@
 import abc
+import typing
 
-from core import constants
+from core import constants, metrics
 from core.buffer import sample_batch
+
+LearningStats = typing.Dict[metrics.LearningMetrics, typing.Any]
 
 
 class Policy(abc.ABC):
@@ -16,7 +19,7 @@ class Policy(abc.ABC):
         self.global_timestep = 0
 
     @abc.abstractmethod
-    def initial_hidden_state(self):
+    def get_initial_hidden_state(self):
         ...
 
     def on_global_timestep_update(self, t):
@@ -27,5 +30,5 @@ class Policy(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def learn(self, samples: sample_batch.SampleBatch):
+    def learn(self, samples: sample_batch.SampleBatch) -> LearningStats:
         ...

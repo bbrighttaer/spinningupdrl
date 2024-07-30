@@ -3,4 +3,4 @@ exp_results
 *.ipynb
 .idea
 *.pyx
-*.pyc
+*/*.pyc

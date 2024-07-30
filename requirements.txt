@@ -37,11 +37,13 @@ mpmath==1.3.0
 mujoco==3.2.0
 mujoco-py==2.1.2.14
 networkx==3.3
-numpy==2.0.1
+numpy==1.26.4
 opencv-python==4.10.0.84
 opt-einsum==3.3.0
 packaging==24.1
+pandas==2.2.2
 pillow==10.4.0
+prettytable==3.10.2
 proglog==0.1.10
 protobuf==4.25.4
 pycparser==2.22
@@ -49,6 +51,7 @@ pygame==2.6.0
 PyOpenGL==3.1.7
 pyparsing==3.1.2
 python-dateutil==2.9.0.post0
+pytz==2024.1
 requests==2.32.3
 scipy==1.14.0
 Shimmy==0.2.1
@@ -60,6 +63,8 @@ tensorboard-data-server==0.7.2
 torch==2.4.0
 tqdm==4.66.4
 typing_extensions==4.12.2
+tzdata==2024.1
 urllib3==2.2.2
+wcwidth==0.2.13
 Werkzeug==3.0.3
 zipp==3.19.2

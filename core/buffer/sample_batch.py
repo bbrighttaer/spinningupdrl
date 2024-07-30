@@ -1,3 +1,8 @@
+from typing import Callable
+
+import numpy as np
+import torch
+
 from core import constants
 from core.buffer.episode import Episode
 
@@ -36,6 +41,21 @@ class SampleBatch(dict):
             constants.MASK: batch_ep.mask[0],
         })
         self._count = len(batch)
+        self._intercepted = {}
+        self._interceptor = None
+
+    def set_get_interceptor(self, interceptor: Callable[[np.ndarray], torch.Tensor]):
+        self._interceptor = interceptor
 
     def __len__(self):
         return self._count
+
+    def __getitem__(self, key):
+        value = dict.__getitem__(self, key)
+        if self._interceptor is not None:
+            if key in self._intercepted:
+                return self._intercepted[key]
+            tensor = self._interceptor(value)
+            self._intercepted[key] = tensor
+            return tensor
+        return value

@@ -6,7 +6,7 @@ from core.buffer import sample_batch
 
 class SamplePolicy(Policy):
 
-    def initial_hidden_state(self):
+    def get_initial_hidden_state(self):
         return []
 
     def compute_action(self, obs, prev_action, prev_hidden_state, **kwargs):

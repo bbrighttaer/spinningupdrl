@@ -1,6 +1,7 @@
 import argparse
 
 from core import constants
+from core.utils import DotDic
 
 
 def cmd_arguments():
@@ -42,7 +43,7 @@ def cmd_arguments():
     parser.add_argument(
         "--total_timesteps",
         type=int,
-        default=100000,
+        default=1000000,
         help="Total number of time steps of the experiment."
     )
 
@@ -57,9 +58,10 @@ def cmd_arguments():
         "--evaluation_num_episodes",
         type=int,
         default=20,
-        help="The number of episodes to run per each evaluation phase"
+        help="The number of episodes to run per each evaluation phase."
     )
 
     args = parser.parse_args()
+    args = DotDic(args.__dict__)
 
     return args

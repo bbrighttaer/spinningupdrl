@@ -102,3 +102,17 @@ def convert_to_tensor(x, device=None):
 
 def to_numpy(tensor):
     return tensor.cpu().detach().numpy()
+
+
+def unroll_mac(model, obs_batch, **kwargs):
+    B, T = obs_batch.shape[:2]
+    h = model.get_initial_state()
+
+    outputs = []
+    for t in range(T):
+        obs_t = obs_batch[:, t]
+        out, h = model(obs_t, h, **kwargs)
+        outputs.append(out.unsqueeze(1))
+
+    model_out = torch.cat(outputs, dim=1)
+    return model_out

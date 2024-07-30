@@ -4,6 +4,13 @@ RUNNING_CONFIG = "running_config"
 ALGO_CONFIG = "algo_config"
 MODEL_CONFIG = "model_config"
 ENV_CONFIG = "env_config"
+CMD_LINE_ARGS = "cmd_line_args"
+
+# GENERAL
+TIMESTEP = "timestep"
+ITER = "iter"
+TOTAL_TIME = "total time (s)"
+TRIAL_NAME = "trial name"
 
 # experience-related constants
 OBS = "observation"
@@ -20,3 +27,5 @@ MASK = "mask"
 SINGLE_AGENT = "sa"
 MULTI_AGENT = "ma"
 MULTI_AGENT_WITH_PARAMETER_SHARING = "ma-ps"
+TRAINING = "training"
+EVALUATION = "evaluation"

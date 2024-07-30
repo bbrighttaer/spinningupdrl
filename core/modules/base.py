@@ -10,7 +10,7 @@ class TorchModel(nn.Module):
         self.action_dim = action_dim
         self.model_config = config
 
-    def initial_state(self):
+    def get_initial_state(self):
         return []
 
     def forward(self, input_obs, hidden_state, **kwargs):

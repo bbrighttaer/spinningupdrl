@@ -1,4 +1,3 @@
-
 import logging
 import logging.handlers
 
@@ -6,19 +5,27 @@ import colorlog
 
 
 class Logger:
-    def __init__(self, exp_name, working_dir, level) -> None:
-
-        self.root = logging.getLogger(exp_name)
+    def __init__(self, trial_name, working_dir, level) -> None:
+        self.root = logging.getLogger(trial_name)
         if not self.root.hasHandlers():
             # create handlers
-            self.file_handler = logging.handlers.RotatingFileHandler(filename=f"{working_dir}/{exp_name}.log", mode='a')
+            self.file_handler = logging.handlers.RotatingFileHandler(filename=f"{working_dir}/{trial_name}.log",
+                                                                     mode='a')
             self.console_handler = logging.StreamHandler()
 
             # create formatter
             formatter = colorlog.ColoredFormatter(
                 # f'%(log_color)s [%(asctime)s] %(levelname)-3s %(name)s: %(message)s',
-                f'%(log_color)s [%(asctime)s]: %(message)s',
+                # f'%(log_color)s [%(asctime)s]: %(message)s',
+                fmt="%(log_color)s[%(asctime)s]\n%(message)s",
                 datefmt='%y-%m-%d %H:%M:%s',
+                log_colors={
+                    "DEBUG": "white",
+                    "INFO": "light_white",
+                    "WARNING": "yellow",
+                    "ERROR": "red",
+                    "CRITICAL": "bold_red",
+                }
             )
 
             # associate handlers with formatter
