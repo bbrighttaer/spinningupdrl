@@ -53,6 +53,22 @@ class DQNPolicy(Policy):
     def update_target(self):
         utils.soft_update(self.target_model, self.model, self.config[constants.ALGO_CONFIG].tau)
 
+    def get_weights(self):
+        return {
+            "model": utils.tensor_state_dict_to_numpy_state_dict(self.model.state_dict()),
+            "target_model": utils.tensor_state_dict_to_numpy_state_dict(self.target_model.state_dict())
+        }
+
+    def set_weights(self, weights):
+        if "model" in weights:
+            self.model.load_state_dict(
+                utils.numpy_state_dict_to_tensor_state_dict(weights["model"], self.device)
+            )
+        if "target_model" in weights:
+            self.target_model.load_state_dict(
+                utils.numpy_state_dict_to_tensor_state_dict(weights["model"], self.device)
+            )
+
     @torch.no_grad()
     def compute_action(self, obs, prev_action, prev_hidden_state, explore, **kwargs):
         self.model.eval()

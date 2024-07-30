@@ -32,3 +32,11 @@ class Policy(abc.ABC):
     @abc.abstractmethod
     def learn(self, samples: sample_batch.SampleBatch) -> LearningStats:
         ...
+
+    @abc.abstractmethod
+    def get_weights(self) -> typing.Dict:
+        ...
+
+    @abc.abstractmethod
+    def set_weights(self, weights):
+        ...

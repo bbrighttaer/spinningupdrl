@@ -1,8 +1,10 @@
 import copy
 import datetime
+import os
 import random
 import string
 
+import joblib
 import numpy as np
 import torch.nn
 
@@ -116,3 +118,25 @@ def unroll_mac(model, obs_batch, **kwargs):
 
     model_out = torch.cat(outputs, dim=1)
     return model_out
+
+
+def tensor_state_dict_to_numpy_state_dict(state_dict):
+    return {k: to_numpy(v) for k, v in state_dict.items()}
+
+
+def numpy_state_dict_to_tensor_state_dict(state_dict, device):
+    return {
+        k: torch.as_tensor(v).to(device) for k, v in state_dict.items()
+    }
+
+
+def save_policy_weights(policy, base_dir, checkpoint_count):
+    weights = policy.get_weights()
+    chkpt_dir_name = "checkpoints"
+    os.makedirs(os.path.join(base_dir, chkpt_dir_name), exist_ok=True)
+    joblib.dump(weights, os.path.join(base_dir, chkpt_dir_name, f"checkpoint-{checkpoint_count}"))
+
+
+def load_policy_weights(weights_file_path):
+    weights = joblib.load(weights_file_path)
+    return weights

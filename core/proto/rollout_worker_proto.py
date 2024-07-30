@@ -7,8 +7,11 @@ class RolloutWorker(Protocol):
     def timestep(self):
         return 0
 
+    def create_env(self):
+        ...
+
     def generate_trajectory(self):
         ...
 
-    def evaluate_policy(self, num_episodes: int):
+    def evaluate_policy(self, num_episodes: int, render: bool=False) -> bool:
         ...

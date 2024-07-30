@@ -61,6 +61,13 @@ def cmd_arguments():
         help="The number of episodes to run per each evaluation phase."
     )
 
+    parser.add_argument(
+        "--render_dir",
+        type=str,
+        default=None,
+        help="Renders a saved policy in the directory."
+    )
+
     args = parser.parse_args()
     args = DotDic(args.__dict__)
 

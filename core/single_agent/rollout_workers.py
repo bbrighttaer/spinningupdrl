@@ -38,6 +38,9 @@ class SimpleRolloutWorker(RolloutWorker):
         self.callback = callback
         self._timestep = 0
         self.cur_iter = 0
+        self.create_env()
+
+    def create_env(self):
         self.env = gym.make(**self.config[constants.ENV_CONFIG])
 
     @property
@@ -59,7 +62,7 @@ class SimpleRolloutWorker(RolloutWorker):
         episode_len = 0
         episode_reward = 0
 
-        while not done and self.config[constants.CMD_LINE_ARGS].total_timesteps:
+        while not done and self.config[constants.RUNNING_CONFIG].total_timesteps:
             action, hidden_state = self.policy.compute_action(
                 obs=obs.reshape(-1, 1),
                 prev_action=prev_act,
@@ -98,7 +101,7 @@ class SimpleRolloutWorker(RolloutWorker):
 
         self._log_metrics(episode_len, episode_reward, constants.TRAINING)
 
-    def evaluate_policy(self, num_episodes: int):
+    def evaluate_policy(self, num_episodes: int, render=False):
         eval_episode_lens = []
         eval_episode_rewards = []
 
@@ -111,6 +114,9 @@ class SimpleRolloutWorker(RolloutWorker):
             episode_reward = 0
 
             while not done:
+                if render:
+                    self.env.render()
+
                 action, hidden_state = self.policy.compute_action(
                     obs=obs.reshape(-1, 1),
                     prev_action=prev_act,
@@ -130,11 +136,15 @@ class SimpleRolloutWorker(RolloutWorker):
             eval_episode_lens.append(episode_len)
             eval_episode_rewards.append(episode_reward)
 
+        episode_reward_mean = np.mean(eval_episode_rewards)
         self._log_metrics(
             episode_len=np.mean(eval_episode_lens),
-            episode_reward=np.mean(eval_episode_rewards),
+            episode_reward=episode_reward_mean,
             mode=constants.EVALUATION,
         )
+
+        # return flag for terminating the trial if target has been reached
+        return self.config[constants.RUNNING_CONFIG].episode_reward_mean_goal <= episode_reward_mean
 
     def _log_metrics(self, episode_len, episode_reward, mode):
         # logging and metrics

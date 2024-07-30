@@ -1,7 +1,9 @@
 
 RUNNING_CONFIG = {
-    "total_time_steps": 100000,
+    "total_timesteps": 100000,
     "logging_steps": 1000,
+    "checkpoint_freq": 10000,
+    "episode_reward_mean_goal": 1000,
 }
 ALGO_CONFIG = {
     "buffer_size": 5000,
@@ -24,5 +26,5 @@ MODEL_CONFIG = {
     "activation": "relu"
 }
 ENV_CONFIG = {
-    "id": "CartPole-v1"
+    "id": "CartPole-v1",
 }

@@ -5,15 +5,15 @@ import os
 import time
 
 import torch.cuda
-from torch.utils.tensorboard import SummaryWriter
 from prettytable import PrettyTable
+from torch.utils.tensorboard import SummaryWriter
 
 from core import constants
-from core import utils
 from core import single_agent
+from core import utils
+from core.logging import Logger
 from core.metrics.sim_metrics import MetricsManager
 from core.simple_callback import SimpleCallback
-from core.logging import Logger
 
 # random code for the experiment
 TRIAL_CODE = utils.generate_random_label()
@@ -57,7 +57,7 @@ class Runner:
         }
 
         # create experiment directory for all items that would be saved to file
-        trial_name = f"{algo}_{self.cmd_args.mode}_{TRIAL_CODE}"
+        trial_name = f"{algo}_{self.cmd_args.mode}_{env_config.id.lower()}_{TRIAL_CODE}"
         running_config[constants.TRIAL_NAME] = trial_name
         working_dir = os.path.join("exp_results", trial_name)
         os.makedirs(working_dir, exist_ok=True)
@@ -100,13 +100,21 @@ class Runner:
                 policy, replay_buffer, config, summary_writer, metrics_manager, logger, callback=exp_callback
             )
 
+            # check if policy rendering is activated
+            if self.cmd_args.render_dir is not None:
+                self.render(config, policy, rollout_worker)
+                return
+
             # training loop
             last_eval_step = 0
-            while rollout_worker.timestep < self.cmd_args.total_timesteps:
+            last_checkpoint_ts = 0
+            checkpoint_count = 0
+            early_stopping = False
+            while rollout_worker.timestep < running_config.total_timesteps and not early_stopping:
                 # check for evaluation step
                 timestep = rollout_worker.timestep
                 if timestep > (self.cmd_args.evaluation_interval + last_eval_step):
-                    rollout_worker.evaluate_policy(self.cmd_args.evaluation_num_episodes)
+                    early_stopping = rollout_worker.evaluate_policy(self.cmd_args.evaluation_num_episodes)
                     last_eval_step = timestep
 
                 # generate an episode
@@ -115,8 +123,15 @@ class Runner:
                 # training
                 training_worker.train(timestep, rollout_worker.cur_iter)
 
+                # checkpoint
+                if timestep > (running_config.checkpoint_freq + last_checkpoint_ts):
+                    checkpoint_count += 1
+                    last_checkpoint_ts = timestep
+                    utils.save_policy_weights(policy, working_dir, checkpoint_count)
+
             # completion protocol
             rollout_worker.evaluate_policy(self.cmd_args.evaluation_num_episodes)
+            utils.save_policy_weights(policy, working_dir, checkpoint_count + 1)
 
         elif self.cmd_args.mode == constants.MULTI_AGENT:
             ...
@@ -126,3 +141,12 @@ class Runner:
 
         logger.info(f"Total time elapsed is {time.perf_counter() - start_time} seconds")
         summary_writer.close()
+
+    def render(self, config, policy, rollout_worker):
+        assert self.cmd_args.render_dir is not None, "No checkpoint filepath provided"
+        weights = utils.load_policy_weights(self.cmd_args.render_dir)
+        config[constants.RUNNING_CONFIG].total_timesteps = 1000
+        config[constants.ENV_CONFIG].render_mode = "human"
+        rollout_worker.create_env()
+        policy.set_weights(weights)
+        rollout_worker.evaluate_policy(self.cmd_args.evaluation_num_episodes, render=True)
