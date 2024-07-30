@@ -62,7 +62,7 @@ class SimpleRolloutWorker(RolloutWorker):
         episode_len = 0
         episode_reward = 0
 
-        while not done and self.config[constants.RUNNING_CONFIG].total_timesteps:
+        while not done and episode_len < self.config[constants.RUNNING_CONFIG].max_timesteps_per_episode:
             action, hidden_state = self.policy.compute_action(
                 obs=obs.reshape(-1, 1),
                 prev_action=prev_act,
@@ -113,7 +113,7 @@ class SimpleRolloutWorker(RolloutWorker):
             episode_len = 0
             episode_reward = 0
 
-            while not done:
+            while not done and episode_len < self.config[constants.RUNNING_CONFIG].max_timesteps_per_episode:
                 if render:
                     self.env.render()
 

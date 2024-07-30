@@ -48,6 +48,7 @@ class Runner:
         algo_config = utils.DotDic(algo_config)
         model_config = utils.DotDic(utils.update_dict(default_configs.MODEL_CONFIG, self.cmd_args))
         env_config = utils.DotDic(utils.update_dict(default_configs.ENV_CONFIG, self.cmd_args))
+        env_config.id = self.cmd_args.env_id
         config = {
             constants.RUNNING_CONFIG: running_config,
             constants.ALGO_CONFIG: algo_config,

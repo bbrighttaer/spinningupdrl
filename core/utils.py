@@ -33,12 +33,13 @@ def update_dict(target_dict: dict, ref_dict: dict, create=False):
     """
     target_dict = copy.deepcopy(target_dict)
     for k in ref_dict:
-        if create:
-            target_dict[k] = ref_dict[k]
+        ref_val = ref_dict[k]
+        if create and ref_val is not None:
+            target_dict[k] = ref_val
             continue
 
-        if k in target_dict:
-            target_dict[k] = ref_dict[k]
+        if k in target_dict and ref_val is not None:
+            target_dict[k] = ref_val
 
     return target_dict
 

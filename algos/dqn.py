@@ -106,8 +106,8 @@ class DQNPolicy(Policy):
         actions = samples[constants.ACTION]
         rewards = samples[constants.REWARD]
         next_obs = samples[constants.NEXT_OBS]
-        dones = samples[constants.DONE]
-        seq_mask = ~samples[constants.MASK]
+        dones = samples[constants.DONE].long()
+        seq_mask = (~samples[constants.MASK]).long()
 
         # reward normalization
         if algo_config.reward_normalization:

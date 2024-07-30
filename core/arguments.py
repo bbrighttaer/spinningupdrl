@@ -68,6 +68,24 @@ def cmd_arguments():
         help="Renders a saved policy in the directory."
     )
 
+    parser.add_argument(
+        "--max_timesteps_per_episode",
+        type=int,
+        help="Controls the maximum number of steps an episode/trajectory can have"
+    )
+
+    parser.add_argument(
+        "--final_epsilon",
+        type=float,
+        help="Sets the final epsilon value"
+    )
+
+    parser.add_argument(
+        "--epsilon_timesteps",
+        type=int,
+        help="Controls the number of timesteps to decay epsilon to `final_epsilon`"
+    )
+
     args = parser.parse_args()
     args = DotDic(args.__dict__)
 

@@ -4,6 +4,7 @@ RUNNING_CONFIG = {
     "logging_steps": 1000,
     "checkpoint_freq": 10000,
     "episode_reward_mean_goal": 1000,
+    "max_timesteps_per_episode": 500,
 }
 ALGO_CONFIG = {
     "buffer_size": 5000,
@@ -22,7 +23,7 @@ ALGO_CONFIG = {
 }
 MODEL_CONFIG = {
     "core_arch": "mlp",
-    "hidden_layers": [64],
+    "hidden_layers": [64, 64],
     "activation": "relu"
 }
 ENV_CONFIG = {
