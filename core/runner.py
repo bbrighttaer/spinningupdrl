@@ -15,6 +15,9 @@ from core.metrics.sim_metrics import MetricsManager
 from core.simple_callback import SimpleCallback
 from core.logging import Logger
 
+# random code for the experiment
+TRIAL_CODE = utils.generate_random_label()
+
 
 class Runner:
     """
@@ -25,12 +28,11 @@ class Runner:
     args - Command line arguments
     """
 
-    def __init__(self, trial_code, args):
+    def __init__(self, args):
         self.cmd_args = args
-        self._trial_code = trial_code
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    def __call__(self, *args, **kwargs):
+    def start(self):
         start_time = time.perf_counter()
 
         # get running algorithm
@@ -55,7 +57,7 @@ class Runner:
         }
 
         # create experiment directory for all items that would be saved to file
-        trial_name = f"{algo}_{self.cmd_args.mode}_{self._trial_code}"
+        trial_name = f"{algo}_{self.cmd_args.mode}_{TRIAL_CODE}"
         running_config[constants.TRIAL_NAME] = trial_name
         working_dir = os.path.join("exp_results", trial_name)
         os.makedirs(working_dir, exist_ok=True)
