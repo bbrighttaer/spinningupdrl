@@ -24,7 +24,11 @@ class SimpleRNN(TorchModel):
             ])
             input_dim = hdim
         enc_out_dim = self.model_config.encoder_layers[-1]
-        enc_layers.append(nn.Linear(input_dim, enc_out_dim))
+        enc_layers.extend([
+            nn.Linear(input_dim, enc_out_dim),
+            nn.BatchNorm1d(enc_out_dim),
+            activation()
+        ])
         self.encoder = nn.Sequential(*enc_layers)
 
         # recurrent layer

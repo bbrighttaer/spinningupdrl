@@ -4,12 +4,12 @@ RUNNING_CONFIG = {
     "logging_steps": 1000,
     "checkpoint_freq": 10000,
     "episode_reward_mean_goal": 1000,
-    "max_timesteps_per_episode": 2000,
+    "max_timesteps_per_episode": 1000,
 }
 ALGO_CONFIG = {
     "buffer_size": 5000,
     "epsilon": 1.0,
-    "final_epsilon": 1e-6,
+    "final_epsilon": 1e-8,
     "epsilon_timesteps": 50000,
     "training_batch_size": 32,
     "num_steps_to_training": 1000,

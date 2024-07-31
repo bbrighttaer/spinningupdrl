@@ -59,7 +59,7 @@ class Runner:
 
         # create experiment directory for all items that would be saved to file
         core_arch = model_config.core_arch
-        trial_name = f"{algo}_{core_arch}_{self.cmd_args.mode}_{env_config.id.lower()}_{TRIAL_CODE}"
+        trial_name = f"{self.cmd_args.mode}_{algo}_{core_arch}_{env_config.id.lower()}_{TRIAL_CODE}"
         running_config[constants.TRIAL_NAME] = trial_name
         working_dir = os.path.join("exp_results", trial_name)
         os.makedirs(working_dir, exist_ok=True)
