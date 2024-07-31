@@ -44,15 +44,5 @@ class SingleAgentTrainingWorker(TrainingWorker):
             data=learning_stats,
         )
 
-        # Log stats to TB (assumes all are scalars)
-        for metric in learning_stats:
-            self.summary_writer.add_scalar(
-                tag=f"{constants.TRAINING}/{metric}",
-                scalar_value=learning_stats[metric],
-                global_step=timestep
-            )
-
         # Replay buffer callback (e.g. on-policy buffer can be cleared at this state)
         self.replay.on_learning_completed()
-
-        # Logging

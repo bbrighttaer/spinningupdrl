@@ -22,28 +22,29 @@ class MetricsManager:
     Helper class to manage simulation metrics
     """
 
-    def __init__(self, config, working_dir, logger):
+    def __init__(self, config, working_dir, summary_writer, logger):
         self._start_time = time.perf_counter()
         self.config = config
         self.base_dir = working_dir
+        self.summary_writer = summary_writer
         self.logger = logger
         self._window_size = 100
         self._last_logging_step = 0
 
         # initialize tables
-        common_cols = [
+        self.common_cols = [
             constants.TRIAL_NAME,
             constants.TIMESTEP,
             constants.ITER,
             constants.TOTAL_TIME,
         ]
         self._learning_stats_df = pd.DataFrame({
-            str(k): [] for k in common_cols + list(metrics.LearningMetrics)
+            str(k): [] for k in self.common_cols + list(metrics.LearningMetrics)
         })
         perf_metrics = []
         for m in list(metrics.PerformanceMetrics):
             perf_metrics.extend(_generate_cols_for_metric(m))
-        df_columns = common_cols + perf_metrics
+        df_columns = self.common_cols + perf_metrics
         self._training_stats_df = pd.DataFrame({
             str(k): [] for k in df_columns
         })
@@ -51,7 +52,7 @@ class MetricsManager:
             str(k): [] for k in df_columns
         })
 
-    def add_learning_stats(self, cur_iter: int, timestep: int, data: dict):
+    def add_learning_stats(self, cur_iter: int, timestep: int, data: dict, label_suffix: str = None):
         elapsed_time = time.perf_counter() - self._start_time
         running_config = self.config[constants.RUNNING_CONFIG]
         data = _parse_data_dict(data)
@@ -70,12 +71,21 @@ class MetricsManager:
         }
         row_data.update({k: [v] for k, v in data.items()})
 
+        # logging
+        label = f"{constants.TRAINING}/{constants.LEARNING}"
+        if label_suffix:
+            label += f"/{label_suffix}"
+        self._log_scalars_to_tensorboard(label, row_data, timestep)
+
         # append row to data table
         df2 = pd.DataFrame(row_data)
         self._learning_stats_df = pd.concat([self._learning_stats_df, df2], ignore_index=True)
 
         # save to disk
-        self._learning_stats_df.to_csv(f"{self.base_dir}/learning_stats.csv", index=False)
+        filename = constants.LEARNING
+        if label_suffix:
+            filename += f"_{label_suffix}"
+        self._learning_stats_df.to_csv(f"{self.base_dir}/{filename}_stats.csv", index=False)
 
     def add_performance_metric(self, cur_iter: int, timestep: int, data: dict, training: bool):
         elapsed_time = time.perf_counter() - self._start_time
@@ -83,7 +93,12 @@ class MetricsManager:
         data = _parse_data_dict(data)
 
         # get active data table
-        dataframe = self._training_stats_df if training else self._evaluation_stats_df
+        if training:
+            dataframe = self._training_stats_df
+            prefix = constants.TRAINING
+        else:
+            dataframe = self._evaluation_stats_df
+            prefix = constants.EVALUATION
 
         # ensure new metrics are added
         new_metrics = set(data.keys()) - set(dataframe.columns.values.tolist())
@@ -110,7 +125,8 @@ class MetricsManager:
             row_data[f"{key}_max"] = [np.max(window_vals)]
             row_data[f"{key}_min"] = [np.min(window_vals)]
 
-        # logging
+        # tb, console, and file logging
+        self._log_scalars_to_tensorboard(prefix, row_data, timestep)
         if timestep >= (running_config.logging_steps + self._last_logging_step):
             field_names = []
             field_values = []
@@ -118,6 +134,7 @@ class MetricsManager:
                 if constants.EVALUATION not in col:
                     field_names.append(col)
                     field_values.append(row_data[col][0])
+
             info = PrettyTable(field_names=field_names)
             info.add_row(field_values)
             self.logger.info(str(info))
@@ -129,10 +146,21 @@ class MetricsManager:
             is_empty = len(self._training_stats_df) == 0
             self._training_stats_df = df2 if is_empty else pd.concat([dataframe, df2], ignore_index=True)
             self._training_stats_df.to_csv(
-                f"{self.base_dir}/{constants.TRAINING}_perf_stats.csv", index=False
+                f"{self.base_dir}/{prefix}_perf_stats.csv", index=False
             )
         else:
             self._evaluation_stats_df = pd.concat([dataframe, df2], ignore_index=True)
             self._evaluation_stats_df.to_csv(
-                f"{self.base_dir}/{constants.EVALUATION}_perf_stats.csv", index=False
+                f"{self.base_dir}/{prefix}_perf_stats.csv", index=False
             )
+
+    def _log_scalars_to_tensorboard(self, prefix, row_data, timestep):
+        # tensorboard logging
+        for key in row_data:
+            if key not in self.common_cols:
+                # tb logging
+                self.summary_writer.add_scalar(
+                    tag=f"{prefix}/{key}",
+                    scalar_value=row_data[key][0],
+                    global_step=timestep,
+                )

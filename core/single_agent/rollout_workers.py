@@ -15,7 +15,7 @@ def RolloutWorkerCreator(
         replay_buffer: ReplayBuffer,
         config: dict,
         summary_writer: SummaryWriter,
-         metrics_manager: MetricsManager,
+        metrics_manager: MetricsManager,
         logger, callback=None) -> RolloutWorker:
     return SimpleRolloutWorker(policy, replay_buffer, config, summary_writer, metrics_manager, logger, callback)
 
@@ -70,6 +70,7 @@ class SimpleRolloutWorker(RolloutWorker):
                 explore=True,
             )
             next_obs, reward, done, truncated, info = self.env.step(action)
+            done = done or truncated
 
             # add timestep record to episode/trajectory
             next_state = info.get("next_state") or next_obs
@@ -124,6 +125,7 @@ class SimpleRolloutWorker(RolloutWorker):
                     explore=False,
                 )
                 next_obs, reward, done, truncated, info = self.env.step(action)
+                done = done or truncated
                 episode_reward += reward
 
                 # timestep props update
@@ -147,17 +149,6 @@ class SimpleRolloutWorker(RolloutWorker):
         return self.config[constants.RUNNING_CONFIG].episode_reward_mean_goal <= episode_reward_mean
 
     def _log_metrics(self, episode_len, episode_reward, mode):
-        # logging and metrics
-        self.summary_writer.add_scalar(
-            tag=f"{mode}/{metrics.PerformanceMetrics.EPISODE_REWARD}",
-            scalar_value=episode_reward,
-            global_step=self.timestep,
-        )
-        self.summary_writer.add_scalar(
-            tag=f"{mode}/{metrics.PerformanceMetrics.EPISODE_LENGTH}",
-            scalar_value=episode_len,
-            global_step=self.timestep,
-        )
         self.metrics_manager.add_performance_metric(
             data={
                 metrics.PerformanceMetrics.EPISODE_REWARD: episode_reward,

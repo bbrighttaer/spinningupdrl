@@ -85,7 +85,7 @@ class Runner:
         exp_callback = SimpleCallback(summary_writer, logger)
 
         # metrics handling
-        metrics_manager = MetricsManager(config, working_dir, logger)
+        metrics_manager = MetricsManager(config, working_dir, summary_writer, logger)
 
         # run experiment based on mode
         if self.cmd_args.mode == constants.SINGLE_AGENT:
