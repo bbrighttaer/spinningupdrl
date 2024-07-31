@@ -4,11 +4,12 @@ import torch.nn as nn
 
 from core import utils
 from core.modules.base import TorchModel
+from core.utils import DotDic
 
 
 class SimpleFCNet(TorchModel):
 
-    def __init__(self, obs_dim: int, action_dim: int, config: dict):
+    def __init__(self, obs_dim: int, action_dim: int, config: DotDic):
         super().__init__(obs_dim, action_dim, config)
 
         layers = []

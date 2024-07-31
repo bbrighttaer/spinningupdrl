@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
 
+from core.utils import DotDic
+
 
 class TorchModel(nn.Module):
 
-    def __init__(self, obs_dim: int, action_dim: int, config: dict):
+    def __init__(self, obs_dim: int, action_dim: int, config: DotDic):
         super().__init__()
         self.obs_dim = obs_dim
         self.action_dim = action_dim

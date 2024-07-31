@@ -4,7 +4,7 @@ RUNNING_CONFIG = {
     "logging_steps": 1000,
     "checkpoint_freq": 10000,
     "episode_reward_mean_goal": 1000,
-    "max_timesteps_per_episode": 500,
+    "max_timesteps_per_episode": 2000,
 }
 ALGO_CONFIG = {
     "buffer_size": 5000,
@@ -14,7 +14,7 @@ ALGO_CONFIG = {
     "training_batch_size": 32,
     "num_steps_to_training": 1000,
     "gamma": 0.99,
-    "target_update_freq": 200,
+    "target_update_freq": 100,
     "optimizer": "rmsprop",
     "learning_rate": 0.0005,
     "grad_clip": 10,
@@ -22,9 +22,13 @@ ALGO_CONFIG = {
     "reward_normalization": True,
 }
 MODEL_CONFIG = {
-    "core_arch": "mlp",
+    "core_arch": "rnn",
+    "encoder_layers": [64],
+    "hidden_state_dim": 64,
     "hidden_layers": [64, 64],
-    "activation": "relu"
+    "num_rnn_layers": 1,
+    "activation": "relu",
+    "dropout_rate": 0.,
 }
 ENV_CONFIG = {
     "id": "CartPole-v1",

@@ -109,7 +109,7 @@ def to_numpy(tensor):
 
 def unroll_mac(model, obs_batch, **kwargs):
     B, T = obs_batch.shape[:2]
-    h = model.get_initial_state()
+    h = [s.expand([B, -1]) for s in model.get_initial_state()]
 
     outputs = []
     for t in range(T):

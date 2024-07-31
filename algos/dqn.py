@@ -8,6 +8,7 @@ from core import constants, utils, EPS, metrics
 from core.buffer import sample_batch
 from core.exploration import EpsilonGreedy
 from core.modules.mlp import SimpleFCNet
+from core.modules.rnn import SimpleRNN
 
 
 class DQNPolicy(Policy):
@@ -21,9 +22,14 @@ class DQNPolicy(Policy):
         model_config = config[constants.MODEL_CONFIG]
 
         # create model
-        # if model_config.core_arch == "mlp":
-        self.model = SimpleFCNet(self.obs_size, self.act_size, model_config).to(self.device)
-        self.target_model = SimpleFCNet(self.obs_size, self.act_size, model_config).to(self.device)
+        if model_config.core_arch == "mlp":
+            self.model = SimpleFCNet(self.obs_size, self.act_size, model_config).to(self.device)
+            self.target_model = SimpleFCNet(self.obs_size, self.act_size, model_config).to(self.device)
+        elif model_config.core_arch == "rnn":
+            self.model = SimpleRNN(self.obs_size, self.act_size, model_config).to(self.device)
+            self.target_model = SimpleRNN(self.obs_size, self.act_size, model_config).to(self.device)
+        else:
+            raise RuntimeError("Core arch should be either gru or mlp")
 
         # create optimizers
         self.params = list(self.model.parameters())
@@ -45,7 +51,8 @@ class DQNPolicy(Policy):
 
         # trigger initial network sync
         self.update_target()
-        self._last_target_update_ts = 0
+        self._last_target_update = 0
+        self._training_count = 0
 
     def get_initial_hidden_state(self):
         return self.model.get_initial_state()
@@ -96,6 +103,7 @@ class DQNPolicy(Policy):
 
     def learn(self, samples: sample_batch.SampleBatch) -> LearningStats:
         self.model.train()
+        self._training_count += 1
         algo_config = self.config[constants.ALGO_CONFIG]
 
         # set a get interceptor to convert values to tensor on retrieval
@@ -146,9 +154,9 @@ class DQNPolicy(Policy):
         self.optimizer.step()
 
         # target model update
-        if self.global_timestep > algo_config.target_update_freq + self._last_target_update_ts:
+        if self._training_count > algo_config.target_update_freq + self._last_target_update:
             self.update_target()
-            self._last_target_update_ts = self.global_timestep
+            self._last_target_update = self._training_count
 
         # metrics gathering
         mask_elems = seq_mask.sum().item()
