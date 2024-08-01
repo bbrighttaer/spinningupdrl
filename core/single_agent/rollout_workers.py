@@ -3,7 +3,7 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
 from algos import Policy
-from core import constants, metrics
+from core import constants, metrics, utils
 from core.buffer.episode import Episode
 from core.metrics.sim_metrics import MetricsManager
 from core.proto.replay_buffer_proto import ReplayBuffer
@@ -37,7 +37,7 @@ class SimpleRolloutWorker(RolloutWorker):
         self.logger = logger
         self.callback = callback
         self._timestep = 0
-        self.cur_iter = 0
+        self._cur_iter = 0
         self.create_env()
 
     def create_env(self):
@@ -47,14 +47,18 @@ class SimpleRolloutWorker(RolloutWorker):
     def timestep(self):
         return self._timestep
 
+    @property
+    def cur_iter(self):
+        return self._cur_iter
+
     def _increment_timestep(self):
         self._timestep += 1
         self.policy.on_global_timestep_update(self._timestep)
 
     def generate_trajectory(self):
-        self.cur_iter += 1
+        self._cur_iter += 1
         obs, info = self.env.reset()
-        state = info.get("state") or obs
+        state = info.get(constants.STATE)
         done = False
         prev_act = 0
         prev_hidden_state = self.policy.get_initial_hidden_state()
@@ -64,26 +68,32 @@ class SimpleRolloutWorker(RolloutWorker):
 
         while not done and episode_len < self.config[constants.RUNNING_CONFIG].max_timesteps_per_episode:
             action, hidden_state = self.policy.compute_action(
-                obs=obs.reshape(-1, 1),
+                obs=utils.to_numpy_array(obs),
                 prev_action=prev_act,
                 prev_hidden_state=prev_hidden_state,
                 explore=True,
+                state=utils.to_numpy_array(state),
             )
             next_obs, reward, done, truncated, info = self.env.step(action)
             done = done or truncated
 
             # add timestep record to episode/trajectory
-            next_state = info.get("next_state") or next_obs
-            episode.add(
-                obs=obs,
-                act=action,
-                reward=reward,
-                next_obs=next_obs,
-                done=done,
-                state=state,
-                next_state=next_state,
-                prev_action=prev_act,
-            )
+            next_state = info.get(constants.NEXT_STATE)
+            experience = {
+                constants.OBS: obs,
+                constants.ACTION: action,
+                constants.REWARD: reward,
+                constants.NEXT_OBS: next_obs,
+                constants.DONE: done,
+                constants.PREV_ACTION: prev_act,
+                constants.SEQ_MASK: False,
+            }
+            if state is not None and next_state is not None:
+                experience.update({
+                    constants.STATE: state,
+                    constants.NEXT_STATE: next_state,
+                })
+            episode.add(**experience)
 
             # timestep props update
             obs = next_obs
@@ -108,6 +118,7 @@ class SimpleRolloutWorker(RolloutWorker):
 
         for i in range(num_episodes):
             obs, info = self.env.reset()
+            state = info.get("state")
             done = False
             prev_act = 0
             prev_hidden_state = self.policy.get_initial_hidden_state()
@@ -119,10 +130,11 @@ class SimpleRolloutWorker(RolloutWorker):
                     self.env.render()
 
                 action, hidden_state = self.policy.compute_action(
-                    obs=obs.reshape(-1, 1),
+                    obs=utils.to_numpy_array(obs),
                     prev_action=prev_act,
                     prev_hidden_state=prev_hidden_state,
                     explore=False,
+                    state=state,
                 )
                 next_obs, reward, done, truncated, info = self.env.step(action)
                 done = done or truncated
@@ -130,6 +142,7 @@ class SimpleRolloutWorker(RolloutWorker):
 
                 # timestep props update
                 obs = next_obs
+                state = info.get("state")
                 prev_act = action
                 prev_hidden_state = hidden_state
 

@@ -12,8 +12,8 @@ def SingleAgentPolicyCreator(config, summary_writer, logger) -> typing.Tuple[Pol
     config = copy.deepcopy(config)
     env_config = config[constants.ENV_CONFIG]
     env = gym.make(**env_config)
-    env_config["obs_size"] = env.observation_space.shape[0]
-    env_config["act_size"] = env.action_space.n
+    env_config[constants.OBS] = copy.deepcopy(env.observation_space)
+    env_config[constants.ENV_ACT_SPACE] = copy.deepcopy(env.action_space)
     replay_buffer = ReplayBuffer(config[constants.ALGO_CONFIG].buffer_size)
     policy_class = ALGO_REGISTRY[config[constants.ALGO_CONFIG].algo]
     return policy_class(config, summary_writer, logger), replay_buffer

@@ -3,7 +3,7 @@ import random
 import torch
 
 from core import FLOAT_MIN
-from core.proto.exploration import Exploration
+from core.proto.exploration_proto import Exploration
 from core.schedules.piecewise_schedule import PiecewiseSchedule
 
 

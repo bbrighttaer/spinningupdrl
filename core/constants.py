@@ -1,3 +1,4 @@
+import typing
 
 # config-related constants
 RUNNING_CONFIG = "running_config"
@@ -21,7 +22,12 @@ REWARD = "reward"
 STATE = "state"
 NEXT_STATE = "next_state"
 DONE = "done"
-MASK = "mask"
+SEQ_MASK = "seq_mask"
+ACTION_MASK = "action_mask"
+RECEIVED_MESSAGE = "received_msg"
+SENT_MESSAGE = "sent_msg"
+HIDDEN_STATE = "hidden_state"
+INFO = "info"
 
 # Experiment modes
 SINGLE_AGENT = "sa"
@@ -30,3 +36,19 @@ MULTI_AGENT_WITH_PARAMETER_SHARING = "ma-ps"
 TRAINING = "training"
 EVALUATION = "evaluation"
 LEARNING = "learning"
+
+# Environment-related values
+ENV_ACT_SPACE = "action_space"
+ENV_NUM_AGENTS = "number_of_agents"
+ENV_STATE_SPACE = "state_space"
+
+# execution strategies
+COMM_BEFORE_ACTION_SELECTION_EXEC_STRATEGY = "comm_before_action"
+ACTION_AND_MESSAGE_SELECTION_EXEC_STRATEGY = "simultaneous_action_and_message"
+DEFAULT_EXEC_STRATEGY = ACTION_AND_MESSAGE_SELECTION_EXEC_STRATEGY
+
+
+# Types
+NDArray = typing.TypeVar("NDArray")
+AgentID = str
+PolicyID = str

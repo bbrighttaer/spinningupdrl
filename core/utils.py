@@ -103,8 +103,20 @@ def convert_to_tensor(x, device=None):
         return torch.from_numpy(x)
 
 
-def to_numpy(tensor):
+def tensor_to_numpy(tensor):
     return tensor.cpu().detach().numpy()
+
+
+def to_numpy_array(x, dtype=np.float32):
+    if x is None:
+        return
+
+    if isinstance(x, np.ndarray):
+        return x.astype(np.float32)
+    elif type(x) in [list, set, tuple]:
+        return np.array(x, dtype=dtype)
+    else:
+        return np.array([x], dtype=dtype)
 
 
 def unroll_mac(model, obs_batch, **kwargs):
@@ -122,7 +134,7 @@ def unroll_mac(model, obs_batch, **kwargs):
 
 
 def tensor_state_dict_to_numpy_state_dict(state_dict):
-    return {k: to_numpy(v) for k, v in state_dict.items()}
+    return {k: tensor_to_numpy(v) for k, v in state_dict.items()}
 
 
 def numpy_state_dict_to_tensor_state_dict(state_dict, device):
@@ -132,7 +144,10 @@ def numpy_state_dict_to_tensor_state_dict(state_dict, device):
 
 
 def save_policy_weights(policy, base_dir, checkpoint_count):
-    weights = policy.get_weights()
+    if isinstance(policy, dict):
+        weights = {policy_id: policy[policy_id].get_weights() for policy_id in policy}
+    else:
+        weights = policy.get_weights()
     chkpt_dir_name = "checkpoints"
     os.makedirs(os.path.join(base_dir, chkpt_dir_name), exist_ok=True)
     joblib.dump(weights, os.path.join(base_dir, chkpt_dir_name, f"checkpoint-{checkpoint_count}"))

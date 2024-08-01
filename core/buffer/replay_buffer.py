@@ -12,9 +12,10 @@ class ReplayBuffer(ReplayBufferProto):
     Simple off-policy replay buffer to store and sample experiences.
     """
 
-    def __init__(self, capacity: int):
+    def __init__(self, capacity: int, policy_id=None):
         self.capacity = capacity
         self._buffer: typing.List[Episode] = []
+        self.policy_id = policy_id
 
     def add(self, episode: Episode):
         if len(self._buffer) >= self.capacity:

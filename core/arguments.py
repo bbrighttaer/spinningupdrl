@@ -50,7 +50,7 @@ def cmd_arguments():
     parser.add_argument(
         "--evaluation_interval",
         type=int,
-        default=10000,
+        default=1000,
         help="Number of training time steps before an evaluation phase."
     )
 

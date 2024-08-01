@@ -16,37 +16,34 @@ class DQNPolicy(Policy):
     Single-agent DQN Policy
     """
 
-    def __init__(self, config, summary_writer, logger):
-        super().__init__(config, summary_writer, logger)
-        algo_config = config[constants.ALGO_CONFIG]
-        model_config = config[constants.MODEL_CONFIG]
-
+    def __init__(self, config, summary_writer, logger, policy_id=None):
+        super().__init__(config, summary_writer, logger, policy_id)
         # create model
-        if model_config.core_arch == "mlp":
-            self.model = SimpleFCNet(self.obs_size, self.act_size, model_config).to(self.device)
-            self.target_model = SimpleFCNet(self.obs_size, self.act_size, model_config).to(self.device)
-        elif model_config.core_arch == "rnn":
-            self.model = SimpleRNN(self.obs_size, self.act_size, model_config).to(self.device)
-            self.target_model = SimpleRNN(self.obs_size, self.act_size, model_config).to(self.device)
+        if self.model_config.core_arch == "mlp":
+            self.model = SimpleFCNet(self.model_config).to(self.device)
+            self.target_model = SimpleFCNet(self.model_config).to(self.device)
+        elif self.model_config.core_arch == "rnn":
+            self.model = SimpleRNN(self.model_config).to(self.device)
+            self.target_model = SimpleRNN(self.model_config).to(self.device)
         else:
             raise RuntimeError("Core arch should be either gru or mlp")
 
         # create optimizers
         self.params = list(self.model.parameters())
-        if algo_config.optimizer == "rmsprop":
+        if self.algo_config.optimizer == "rmsprop":
             from torch.optim import RMSprop
-            self.optimizer = RMSprop(params=self.params, lr=algo_config.learning_rate)
-        elif algo_config.optimizer == "adam":
+            self.optimizer = RMSprop(params=self.params, lr=self.algo_config.learning_rate)
+        elif self.algo_config.optimizer == "adam":
             from torch.optim import Adam
-            self.optimizer = Adam(params=self.params, lr=algo_config.learning_rate)
+            self.optimizer = Adam(params=self.params, lr=self.algo_config.learning_rate)
         else:
-            raise RuntimeError(f"Unsupported optimizer: {algo_config.optimizer}")
+            raise RuntimeError(f"Unsupported optimizer: {self.algo_config.optimizer}")
 
         # exploration or action selection strategy
         self.exploration = EpsilonGreedy(
-            initial_epsilon=algo_config.epsilon,
-            final_epsilon=algo_config.final_epsilon,
-            epsilon_timesteps=algo_config.epsilon_timesteps,
+            initial_epsilon=self.algo_config.epsilon,
+            final_epsilon=self.algo_config.final_epsilon,
+            epsilon_timesteps=self.algo_config.epsilon_timesteps,
         )
 
         # trigger initial network sync
@@ -77,7 +74,7 @@ class DQNPolicy(Policy):
             )
 
     @torch.no_grad()
-    def compute_action(self, obs, prev_action, prev_hidden_state, explore, **kwargs):
+    def compute_action(self, obs, prev_action, prev_hidden_state, explore, state, **kwargs):
         self.model.eval()
 
         # convert obs to tensor
@@ -99,7 +96,7 @@ class DQNPolicy(Policy):
             explore=explore,
         )
 
-        return action, [utils.to_numpy(h) for h in hidden_states]
+        return action, [utils.tensor_to_numpy(h) for h in hidden_states]
 
     def learn(self, samples: sample_batch.SampleBatch) -> LearningStats:
         self.model.train()
@@ -113,9 +110,10 @@ class DQNPolicy(Policy):
         obs = samples[constants.OBS]
         actions = samples[constants.ACTION]
         rewards = samples[constants.REWARD]
+        rewards = rewards.float()
         next_obs = samples[constants.NEXT_OBS]
         dones = samples[constants.DONE].long()
-        seq_mask = (~samples[constants.MASK]).long()
+        seq_mask = (~samples[constants.SEQ_MASK]).long()
 
         # reward normalization
         if algo_config.reward_normalization:
@@ -144,7 +142,8 @@ class DQNPolicy(Policy):
         td_error = targets - q_values
         masked_td_error = seq_mask * td_error
         loss = masked_td_error ** 2
-        loss = loss.sum() / (seq_mask.sum() + EPS)
+        seq_mask_sum = seq_mask.sum()
+        loss = loss.sum() / (seq_mask_sum + EPS)
 
         # optimization
         self.optimizer.zero_grad()
@@ -159,7 +158,7 @@ class DQNPolicy(Policy):
             self._last_target_update = self._training_count
 
         # metrics gathering
-        mask_elems = seq_mask.sum().item()
+        mask_elems = seq_mask_sum.item()
         return {
             metrics.LearningMetrics.TRAINING_LOSS: loss.item(),
             metrics.LearningMetrics.GRAD_NORM: grad_norm if isinstance(grad_norm, float) else grad_norm.item(),

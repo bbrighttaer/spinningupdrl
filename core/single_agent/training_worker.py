@@ -27,8 +27,8 @@ class SingleAgentTrainingWorker(TrainingWorker):
     def train(self, timestep: int, cur_iter: int):
         algo_config = self.config[constants.ALGO_CONFIG]
 
-        # Train after `num_steps_to_training` time steps
-        if timestep < algo_config.num_steps_to_training:
+        # Train after `num_steps_to_training` timesteps
+        if len(self.replay) < algo_config.replay_start_size:
             return
 
         # Sample a batch from the buffer
@@ -44,5 +44,5 @@ class SingleAgentTrainingWorker(TrainingWorker):
             data=learning_stats,
         )
 
-        # Replay buffer callback (e.g. on-policy buffer can be cleared at this state)
+        # Replay buffer callback (e.g. on-policy buffer can be cleared at this stage)
         self.replay.on_learning_completed()

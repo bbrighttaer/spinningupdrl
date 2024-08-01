@@ -1,7 +1,9 @@
 import copy
+from collections import defaultdict
 
 import numpy as np
 
+from core import constants
 from core.proto.episode_proto import Episode as EpisodeProto
 
 
@@ -11,51 +13,29 @@ class Episode(EpisodeProto):
     """
 
     def __init__(self):
-        self.obs = []
-        self.action = []
-        self.reward = []
-        self.next_obs = []
-        self.done = []
-        self.state = []
-        self.next_state = []
-        self.prev_action = []
-        self.mask = []
+        self._episode_data = defaultdict(list)
 
-    def add(self, obs, act, reward, next_obs, done, state, next_state, prev_action, mask=False):
+    @property
+    def data(self):
+        # return a copy, to avoid any potential tampering
+        return copy.deepcopy(self._episode_data)
+
+    def add(self, **experience):
         """
-        Adds an episode record.
-
-        Arguments
-        ----------
-        :param obs: observation_t
-        :param act: action_t
-        :param reward: reward_t
-        :param next_obs: observation_{t+1}
-        :param done: whether episode has ended
-        :param state: state_t
-        :param next_state: state_{t+1}
-        :param prev_action: action_{t-1}
-        :param mask: whether this record is a padding
+        Adds an episode/experience record.
         """
         def wrap(obj):
             return obj if isinstance(obj, np.ndarray) or isinstance(obj, list) else [obj]
 
-        self.obs.append(wrap(obs))
-        self.action.append(wrap(act))
-        self.reward.append(wrap(reward))
-        self.next_obs.append(wrap(next_obs))
-        self.done.append(wrap(done))
-        self.state.append(wrap(state))
-        self.next_state.append(wrap(next_state))
-        self.prev_action.append(wrap(prev_action))
-        self.mask.append(wrap(mask))
+        for key, value in experience.items():
+            self._episode_data[key].append(wrap(value))
 
     def __len__(self):
-        return len(self.obs)
+        return len(self._episode_data[list(self._episode_data.keys())[0]])
 
     def pad_episode(self, size) -> "Episode":
         """
-        Pads a copy of this episode by the given size.
+        Pads a copy of this episode by the given size (sequence padding).
 
         Arguments
         ----------
@@ -63,20 +43,15 @@ class Episode(EpisodeProto):
         :return: Padded copy
         """
         ep_copy = copy.deepcopy(self)
-        obs = ep_copy.obs[-1]
-        state = ep_copy.state[-1]
+
         for i in range(size):
-            ep_copy.add(
-                obs=np.zeros_like(obs),
-                act=0,
-                reward=0,
-                next_obs=np.zeros_like(obs),
-                done=0,
-                state=np.zeros_like(state),
-                next_state=np.zeros_like(state),
-                prev_action=0,
-                mask=True,
-            )
+            pad_entry = {}
+            for key, val_list in self._episode_data.items():
+                pad = np.zeros_like(val_list[-1])
+                # since the expected `seq_mask` value for actual experiences is `False`,
+                # the value is negated for the padding if the `seq_mask` field is encountered.
+                pad_entry[key] = ~pad if key == constants.SEQ_MASK else pad
+            ep_copy.add(**pad_entry)
         return ep_copy
 
     def merge_time_steps(self) -> 'Episode':
@@ -86,16 +61,6 @@ class Episode(EpisodeProto):
         :return: Episode with a single batch entry for each property.
         """
         episode = Episode()
-        episode.add(
-            obs=np.stack(self.obs),
-            act=np.stack(self.action),
-            reward=np.stack(self.reward),
-            next_obs=np.stack(self.next_obs),
-            done=np.stack(self.done),
-            state=np.stack(self.state),
-            next_state=np.stack(self.next_state),
-            prev_action=np.stack(self.prev_action),
-            mask=np.stack(self.mask),
-        )
+        episode.add(**{key: np.stack(value) for key, value in self._episode_data.items()})
         return episode
 

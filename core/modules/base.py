@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 
 from core.utils import DotDic
@@ -6,10 +5,12 @@ from core.utils import DotDic
 
 class TorchModel(nn.Module):
 
-    def __init__(self, obs_dim: int, action_dim: int, config: DotDic):
+    def __init__(self, config: DotDic):
         super().__init__()
-        self.obs_dim = obs_dim
-        self.action_dim = action_dim
+        self.obs_dim = config.obs_size
+        self.action_dim = config.n_actions
+        self.comm_dim = config.comm_size
+        self.state_dim = config.state_size
         self.model_config = config
 
     def get_initial_state(self):

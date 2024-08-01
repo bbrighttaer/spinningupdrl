@@ -10,13 +10,13 @@ from core.utils import DotDic
 
 class SimpleRNN(TorchModel):
 
-    def __init__(self, obs_dim: int, action_dim: int, config: DotDic):
-        super().__init__(obs_dim, action_dim, config)
+    def __init__(self, config: DotDic):
+        super().__init__(config)
         activation = utils.get_activation_function(self.model_config["activation"])
 
         # encoder
         enc_layers = []
-        input_dim = obs_dim
+        input_dim = self.obs_dim
         for hdim in self.model_config.encoder_layers[:-1]:
             enc_layers.extend([
                 nn.Linear(input_dim, hdim),
@@ -44,7 +44,7 @@ class SimpleRNN(TorchModel):
         self.output = nn.Sequential(
             nn.BatchNorm1d(self.model_config.hidden_state_dim),
             activation(),
-            nn.Linear(self.model_config.hidden_state_dim, action_dim)
+            nn.Linear(self.model_config.hidden_state_dim, self.action_dim)
         )
 
     def get_initial_state(self):
