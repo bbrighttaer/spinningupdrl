@@ -21,7 +21,7 @@ def MultiAgentIndependentPolicyCreator(
     assert isinstance(env.unwrapped, MultiAgentEnv), "A MultiAgentEnv environment type is required"
     assert isinstance(env.observation_space, gym.spaces.Dict), ("Observation space of multi-agent env should "
                                                                 "be gym.spaces.Dict, with agent IDs as the keys")
-    env_info = env.get_env_info()
+    env_info = env.unwrapped.get_env_info()
     policy_mapping = {}
     replay_buffer_mapping = {}
 

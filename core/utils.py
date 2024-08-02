@@ -100,7 +100,7 @@ def convert_to_tensor(x, device=None):
     if isinstance(x, np.ndarray):
         if x.dtype == np.object_:
             return x
-        return torch.from_numpy(x)
+        return torch.from_numpy(x).to(device)
 
 
 def tensor_to_numpy(tensor):

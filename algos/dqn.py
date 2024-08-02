@@ -82,7 +82,7 @@ class DQNPolicy(Policy):
         obs_tensor = obs_tensor.view(1, -1)
 
         # convert hidden states to tensor
-        hidden_states = [utils.convert_to_tensor(h) for h in prev_hidden_state]
+        hidden_states = [utils.convert_to_tensor(h, self.device) for h in prev_hidden_state]
 
         # get q-values
         q_values, hidden_states = self.model(obs_tensor, hidden_states, **kwargs)
