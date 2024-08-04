@@ -11,9 +11,9 @@ from core.modules.mlp import SimpleFCNet
 from core.modules.rnn import SimpleRNN
 
 
-class DQNPolicy(Policy):
+class HIQLPolicy(Policy):
     """
-    Single-agent DQN Policy
+    Hysteretic IQL
     """
 
     def __init__(self, config, summary_writer, logger, policy_id=None):
@@ -140,8 +140,9 @@ class DQNPolicy(Policy):
 
         # one step TD error
         td_error = targets - q_values
+        weights = torch.where(td_error < 0., self.algo_config.beta, self.algo_config.alpha)
         masked_td_error = seq_mask * td_error
-        loss = masked_td_error ** 2
+        loss = weights * masked_td_error ** 2
         seq_mask_sum = seq_mask.sum()
         loss = loss.sum() / (seq_mask_sum + EPS)
 

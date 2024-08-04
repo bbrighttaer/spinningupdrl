@@ -17,7 +17,7 @@ def MultiAgentIndependentPolicyCreator(
 ) -> typing.Tuple[typing.Dict[str, Policy], typing.Dict[str, ReplayBuffer], typing.Callable[[AgentID], PolicyID]]:
     config = copy.deepcopy(config)
     env_config = config[constants.ENV_CONFIG]
-    env = gym.make(**env_config)
+    env = gym.make(**env_config, disable_env_checker=True)
     assert isinstance(env.unwrapped, MultiAgentEnv), "A MultiAgentEnv environment type is required"
     assert isinstance(env.observation_space, gym.spaces.Dict), ("Observation space of multi-agent env should "
                                                                 "be gym.spaces.Dict, with agent IDs as the keys")
@@ -26,12 +26,18 @@ def MultiAgentIndependentPolicyCreator(
     replay_buffer_mapping = {}
 
     n_agents = env_info[constants.ENV_NUM_AGENTS]
+    buffer_size = config[constants.ALGO_CONFIG].buffer_size
+    if config[constants.ALGO_CONFIG].buffer_policy == constants.SHARED_BUFFER:
+        buffer = ReplayBuffer(buffer_size, policy_id="default")
+    else:
+        buffer = None
     for i in range(n_agents):
         policy_id = f"policy_{i}"
         env_config[constants.OBS] = copy.deepcopy(env.observation_space[f"agent_{i}"])
         env_config[constants.ENV_ACT_SPACE] = copy.deepcopy(env.action_space)
-        buffer_size = config[constants.ALGO_CONFIG].buffer_size
-        replay_buffer_mapping[policy_id] = ReplayBuffer(buffer_size, policy_id=policy_id)
+        if buffer is None:
+            buffer = ReplayBuffer(buffer_size, policy_id="default")
+        replay_buffer_mapping[policy_id] = buffer
         policy_class = ALGO_REGISTRY[config[constants.ALGO_CONFIG].algo]
         policy_mapping[policy_id] = policy_class(config, summary_writer, logger, policy_id=policy_id)
 

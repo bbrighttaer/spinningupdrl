@@ -1,3 +1,4 @@
+from collections import Counter
 from functools import partial
 
 import torch
@@ -11,9 +12,21 @@ from core.modules.mlp import SimpleFCNet
 from core.modules.rnn import SimpleRNN
 
 
-class DQNPolicy(Policy):
+def calc_mse_loss(q_values, targets, seq_mask, weights=None):
+    # one step TD error
+    td_error = targets - q_values
+    masked_td_error = seq_mask * td_error
+    loss = masked_td_error ** 2
+    if weights is not None:
+        loss *= weights
+    seq_mask_sum = seq_mask.sum()
+    loss = loss.sum() / (seq_mask_sum + EPS)
+    return loss, masked_td_error, seq_mask_sum
+
+
+class BQLPolicy(Policy):
     """
-    Single-agent DQN Policy
+    Best possible QL
     """
 
     def __init__(self, config, summary_writer, logger, policy_id=None):
@@ -21,15 +34,17 @@ class DQNPolicy(Policy):
         # create model
         if self.model_config.core_arch == "mlp":
             self.model = SimpleFCNet(self.model_config).to(self.device)
-            self.target_model = SimpleFCNet(self.model_config).to(self.device)
+            self.aux_model = SimpleFCNet(self.model_config).to(self.device)
+            self.aux_target_model = SimpleFCNet(self.model_config).to(self.device)
         elif self.model_config.core_arch == "rnn":
             self.model = SimpleRNN(self.model_config).to(self.device)
-            self.target_model = SimpleRNN(self.model_config).to(self.device)
+            self.aux_model = SimpleRNN(self.model_config).to(self.device)
+            self.aux_target_model = SimpleRNN(self.model_config).to(self.device)
         else:
             raise RuntimeError("Core arch should be either gru or mlp")
 
         # create optimizers
-        self.params = list(self.model.parameters())
+        self.params = list(self.model.parameters()) + list(self.aux_model.parameters())
         if self.algo_config.optimizer == "rmsprop":
             from torch.optim import RMSprop
             self.optimizer = RMSprop(params=self.params, lr=self.algo_config.learning_rate)
@@ -55,12 +70,13 @@ class DQNPolicy(Policy):
         return self.model.get_initial_state()
 
     def update_target(self):
-        utils.soft_update(self.target_model, self.model, self.config[constants.ALGO_CONFIG].tau)
+        utils.soft_update(self.aux_target_model, self.aux_model, self.config[constants.ALGO_CONFIG].tau)
 
     def get_weights(self):
         return {
             "model": utils.tensor_state_dict_to_numpy_state_dict(self.model.state_dict()),
-            "target_model": utils.tensor_state_dict_to_numpy_state_dict(self.target_model.state_dict())
+            "aux_model": utils.tensor_state_dict_to_numpy_state_dict(self.aux_model.state_dict()),
+            "aux_target_model": utils.tensor_state_dict_to_numpy_state_dict(self.aux_target_model.state_dict())
         }
 
     def set_weights(self, weights):
@@ -68,9 +84,13 @@ class DQNPolicy(Policy):
             self.model.load_state_dict(
                 utils.numpy_state_dict_to_tensor_state_dict(weights["model"], self.device)
             )
-        if "target_model" in weights:
-            self.target_model.load_state_dict(
-                utils.numpy_state_dict_to_tensor_state_dict(weights["target_model"], self.device)
+        if "aux_model" in weights:
+            self.model.load_state_dict(
+                utils.numpy_state_dict_to_tensor_state_dict(weights["aux_model"], self.device)
+            )
+        if "aux_target_model" in weights:
+            self.aux_target_model.load_state_dict(
+                utils.numpy_state_dict_to_tensor_state_dict(weights["aux_target_model"], self.device)
             )
 
     @torch.no_grad()
@@ -100,6 +120,8 @@ class DQNPolicy(Policy):
 
     def learn(self, samples: sample_batch.SampleBatch) -> LearningStats:
         self.model.train()
+        self.aux_model.train()
+
         self._training_count += 1
         algo_config = self.config[constants.ALGO_CONFIG]
 
@@ -115,6 +137,12 @@ class DQNPolicy(Policy):
         dones = samples[constants.DONE].long()
         seq_mask = (~samples[constants.SEQ_MASK]).long()
 
+        if self.algo_config.show_reward_dist:
+            stats = Counter(rewards.view(-1,).numpy())
+            self.summary_writer.add_scalars(
+                f"training/{self.policy_id}/reward_dist", {str(k): v for k, v in stats.items()}, self.global_timestep
+            )
+
         # reward normalization
         if algo_config.reward_normalization:
             rewards = (rewards - rewards.mean()) / (rewards.std() + EPS)
@@ -124,26 +152,24 @@ class DQNPolicy(Policy):
 
         # get q-values for all experiences
         mac_out = utils.unroll_mac(self.model, whole_obs)
-        target_mac_out = utils.unroll_mac(self.target_model, whole_obs)
+        aux_mac_out = utils.unroll_mac(self.aux_model, whole_obs)
+        aux_target_mac_out = utils.unroll_mac(self.aux_target_model, whole_obs)
 
-        # main model q-values
+        # Qe objective
+        qe_q_values = torch.gather(aux_mac_out[:, :-1], dim=2, index=actions)
+        qi_tp1_q_values = torch.max(mac_out[:, 1:], dim=2)[0]
+        qi_tp1_q_values = qi_tp1_q_values.unsqueeze(dim=2)
+        qe_targets = rewards + (1 - dones) * algo_config.gamma * qi_tp1_q_values
+        qe_loss, qe_masked_td_error, _ = calc_mse_loss(qe_q_values, qe_targets.detach(), seq_mask)
+
+        # Qi objective
         q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions)
+        qe_bar_q_values = torch.gather(aux_target_mac_out[:, :-1], dim=2, index=actions)
+        weights = torch.where(qe_bar_q_values > q_values, 1.0, algo_config.lamda)
+        qi_loss, masked_td_error, seq_mask_sum = calc_mse_loss(q_values, qe_bar_q_values.detach(), seq_mask, weights)
 
-        # target model q-values
-        target_mac_out_tp1 = target_mac_out[:, 1:]
-        target_q_values = torch.max(target_mac_out_tp1, dim=2)[0]
-        target_q_values = target_q_values.unsqueeze(dim=2)
-
-        # compute targets
-        targets = rewards + (1 - dones) * algo_config.gamma * target_q_values
-        targets = targets.detach()
-
-        # one step TD error
-        td_error = targets - q_values
-        masked_td_error = seq_mask * td_error
-        loss = masked_td_error ** 2
-        seq_mask_sum = seq_mask.sum()
-        loss = loss.sum() / (seq_mask_sum + EPS)
+        # aggregate the two objectives
+        loss = qi_loss + qe_loss
 
         # optimization
         self.optimizer.zero_grad()
@@ -164,7 +190,7 @@ class DQNPolicy(Policy):
             metrics.LearningMetrics.GRAD_NORM: grad_norm if isinstance(grad_norm, float) else grad_norm.item(),
             metrics.LearningMetrics.TD_ERROR_ABS: masked_td_error.abs().sum().item() / mask_elems,
             metrics.LearningMetrics.Q_TAKEN_MEAN: (q_values * seq_mask).sum().item() / mask_elems,
-            metrics.LearningMetrics.TARGET_MEAN: (targets * seq_mask).sum().item() / mask_elems,
+            metrics.LearningMetrics.TARGET_MEAN: (qe_bar_q_values * seq_mask).sum().item() / mask_elems,
         }
 
 

@@ -11,16 +11,19 @@ ALGO_CONFIG = {
     "epsilon": 1.0,
     "final_epsilon": 0.05,
     "epsilon_timesteps": 2000,
-    "training_batch_size": 32,
+    "training_batch_size": 64,
     "replay_start_size": 100,
     "gamma": 0.99,
     "target_update_freq": 100,
-    "optimizer": "rmsprop",
+    "optimizer": "adam",
     "learning_rate": 0.0005,
     "grad_clip": 10,
-    "tau": 0.5,
+    "tau": 0.7,
+    "alpha": 0.9,
+    "beta": 0.1,
     "reward_normalization": True,
-    "comm_size": 1,  # size or dimension of a message (if communication is enabled)
+    "show_reward_dist": True,
+    "comm_size": 0,  # size or dimension of a message (if communication is enabled)
     "discrete_comm_space_size": 5,  # the size of the message space when using discrete communication
 }
 MODEL_CONFIG = {

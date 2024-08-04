@@ -52,3 +52,8 @@ DEFAULT_EXEC_STRATEGY = ACTION_AND_MESSAGE_SELECTION_EXEC_STRATEGY
 NDArray = typing.TypeVar("NDArray")
 AgentID = str
 PolicyID = str
+
+
+# Replay buffer policies
+SHARED_BUFFER = "shared_replay_buffer"
+INDIVIDUAL_BUFFER = "individual_replay_buffer"

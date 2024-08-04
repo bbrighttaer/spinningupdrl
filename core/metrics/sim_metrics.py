@@ -138,7 +138,8 @@ class MetricsManager:
             info = PrettyTable(field_names=field_names)
             info.add_row(field_values)
             self.logger.info(str(info))
-            self._last_logging_step = timestep
+            if training:
+                self._last_logging_step = timestep
 
         # append row to data table and save to disk
         df2 = pd.DataFrame(row_data)

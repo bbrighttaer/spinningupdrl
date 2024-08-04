@@ -9,8 +9,8 @@ RUNNING_CONFIG = {
 ALGO_CONFIG = {
     "buffer_size": 5000,
     "epsilon": 1.0,
-    "final_epsilon": 1e-8,
-    "epsilon_timesteps": 50000,
+    "final_epsilon": 0.05,
+    "epsilon_timesteps": 100000,
     "training_batch_size": 32,
     "replay_start_size": 1000,
     "gamma": 0.99,
@@ -23,13 +23,13 @@ ALGO_CONFIG = {
 }
 MODEL_CONFIG = {
     "core_arch": "rnn",
-    "encoder_layers": [64],
-    "hidden_state_dim": 64,
+    "encoder_layers": [128],
+    "hidden_state_dim": 128,
     "hidden_layers": [64, 64],
-    "num_rnn_layers": 1,
+    "num_rnn_layers": 2,
     "activation": "relu",
-    "dropout_rate": 0.,
+    "dropout_rate": 0.2,
 }
 ENV_CONFIG = {
-    "id": "CartPole-v1",
+    "id": "MountainCar-v0",
 }

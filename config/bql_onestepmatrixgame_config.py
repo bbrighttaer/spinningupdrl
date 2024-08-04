@@ -1,3 +1,4 @@
+from core import constants
 
 RUNNING_CONFIG = {
     "total_timesteps": 10000,
@@ -8,19 +9,22 @@ RUNNING_CONFIG = {
 }
 ALGO_CONFIG = {
     "buffer_size": 5000,
+    "buffer_policy": constants.SHARED_BUFFER,
     "epsilon": 1.0,
     "final_epsilon": 0.05,
     "epsilon_timesteps": 2000,
     "training_batch_size": 32,
-    "replay_start_size": 100,
-    "gamma": 0.99,
-    "target_update_freq": 100,
+    "replay_start_size": 500,
+    "gamma": 1.,
+    "target_update_freq": 200,
     "optimizer": "rmsprop",
     "learning_rate": 0.0005,
     "grad_clip": 10,
     "tau": 0.5,
-    "reward_normalization": True,
-    "comm_size": 1,  # size or dimension of a message (if communication is enabled)
+    "lamda": 0.1,
+    "reward_normalization": False,
+    "show_reward_dist": True,
+    "comm_size": 0,  # size or dimension of a message (if communication is enabled)
     "discrete_comm_space_size": 5,  # the size of the message space when using discrete communication
 }
 MODEL_CONFIG = {

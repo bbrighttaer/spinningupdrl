@@ -32,7 +32,7 @@ class Policy(abc.ABC):
         self.algo_config = config[constants.ALGO_CONFIG]
         self.model_config = config[constants.MODEL_CONFIG]
         self.device = config[constants.RUNNING_CONFIG].device
-        self.summary_writer = summary_writer,
+        self.summary_writer = summary_writer
         self.logger = logger
         self.policy_id = policy_id  # only relevant in the multi-agent case
         self.global_timestep = 0

@@ -11,11 +11,17 @@ class SimpleFCNet(TorchModel):
         super().__init__(config)
 
         layers = []
-        activation = utils.get_activation_function(self.model_config["activation"])
+        activation = utils.get_activation_function(self.model_config.activation)
+
+        if self.model_config.obs_size == 1 and self.model_config.num_discrete_obs > 0:
+            self.embedding = nn.Embedding(self.model_config.num_discrete_obs, self.model_config.embedding_dim)
+            input_dim = self.model_config.embedding_dim
+        else:
+            self.embedding = None
+            input_dim = self.obs_dim
 
         # create hidden layers
-        input_dim = self.obs_dim
-        for dim in self.model_config["hidden_layers"]:
+        for dim in self.model_config.hidden_layers:
             layers.extend([
                 nn.Linear(input_dim, dim),
                 activation(),
@@ -29,5 +35,7 @@ class SimpleFCNet(TorchModel):
         self.model = nn.Sequential(*layers)
 
     def forward(self, input_obs, hidden_state, **kwargs):
+        if self.embedding is not None:
+            input_obs = self.embedding(input_obs.long()).view(input_obs.shape[0], -1)
         x = self.model(input_obs)
         return x, []

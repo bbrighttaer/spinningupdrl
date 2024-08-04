@@ -58,7 +58,7 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
         self.timestep_execution_strategy = strategy_type(self)
 
     def create_env(self):
-        self.env = gym.make(**self.config[constants.ENV_CONFIG])
+        self.env = gym.make(**self.config[constants.ENV_CONFIG], disable_env_checker=True)
 
     @property
     def timestep(self):
@@ -205,9 +205,6 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
                 prev_hidden_states = results[constants.HIDDEN_STATE]
                 done = bool(sum(results[constants.DONE].values()))
                 prev_messages = results[constants.SENT_MESSAGE]
-
-                # update global time step and trigger related callbacks
-                self._increment_timestep()
 
                 # update episode metrics
                 episode_len += 1
