@@ -1,6 +1,7 @@
 from collections import Counter
 from functools import partial
 
+import numpy as np
 import torch
 
 from algos import Policy
@@ -108,11 +109,19 @@ class BQLPolicy(Policy):
         q_values, hidden_states = self.model(obs_tensor, hidden_states, **kwargs)
 
         # apply action mask
+        if self.action_mask_size > 0 and constants.ACTION_MASK in kwargs:
+            avail_actions = utils.convert_to_tensor(kwargs[constants.ACTION_MASK], self.device)
+            avail_actions = avail_actions.view(*q_values.shape)
+            masked_q_values = q_values.clone()
+            masked_q_values[avail_actions == 0.0] = -float("inf")
+            final_q_values = masked_q_values
+        else:
+            final_q_values = q_values
 
         # select action
         action = self.exploration.select_action(
             timestep=self.global_timestep,
-            logits=q_values,
+            logits=final_q_values,
             explore=explore,
         )
 
@@ -136,6 +145,10 @@ class BQLPolicy(Policy):
         next_obs = samples[constants.NEXT_OBS]
         dones = samples[constants.DONE].long()
         seq_mask = (~samples[constants.SEQ_MASK]).long()
+        if constants.NEXT_ACTION_MASK in samples:
+            next_action_mask = samples[constants.NEXT_ACTION_MASK]
+        else:
+            next_action_mask = None
 
         if self.algo_config.show_reward_dist:
             stats = Counter(rewards.view(-1,).numpy())
@@ -157,7 +170,13 @@ class BQLPolicy(Policy):
 
         # Qe objective
         qe_q_values = torch.gather(aux_mac_out[:, :-1], dim=2, index=actions)
-        qi_tp1_q_values = torch.max(mac_out[:, 1:], dim=2)[0]
+        qi_tp1_q_values = mac_out[:, 1:].clone()
+        # if action mask is present avoid selecting unavailable actions
+        if self.action_mask_size > 0 and next_action_mask is not None:
+            ignore_action_tp1 = (next_action_mask == 0) & (seq_mask == 1)
+            qi_tp1_q_values[ignore_action_tp1] = -np.inf
+        qi_tp1_q_values = torch.max(qi_tp1_q_values, dim=2)[0]
+
         qi_tp1_q_values = qi_tp1_q_values.unsqueeze(dim=2)
         qe_targets = rewards + (1 - dones) * algo_config.gamma * qi_tp1_q_values
         qe_loss, qe_masked_td_error, _ = calc_mse_loss(qe_q_values, qe_targets.detach(), seq_mask)

@@ -10,3 +10,7 @@ gym.register(
     id="OneStepMatrixGame-v0",
     entry_point="core.envs:OneStepMultiAgentCoopMatrixGame",
 )
+gym.register(
+    id="SMAC-v0",
+    entry_point="core.envs:SMACv0",
+)

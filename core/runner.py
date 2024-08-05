@@ -11,9 +11,9 @@ from torch.utils.tensorboard import SummaryWriter
 from core import constants, multi_agent
 from core import single_agent
 from core import utils
+from core.callbacks import DefaultCallback
 from core.logging import Logger
 from core.metrics.sim_metrics import MetricsManager
-from core.simple_callback import SimpleCallback
 
 # random code for the experiment
 TRIAL_CODE = utils.generate_random_label()
@@ -82,11 +82,11 @@ class Runner:
         with open(working_dir + "/config.json", "w") as f:
             json.dump(config, f)
 
-        # callback class
-        exp_callback = SimpleCallback(summary_writer, logger)
-
         # metrics handling
         metrics_manager = MetricsManager(config, working_dir, summary_writer, logger)
+
+        # callback
+        callback = DefaultCallback(metrics_manager, logger)
 
         # run experiment based on mode
         if self.cmd_args.mode == constants.SINGLE_AGENT:
@@ -95,12 +95,12 @@ class Runner:
 
             # create rollout worker
             rollout_worker = single_agent.RolloutWorkerCreator(
-                policy, replay_buffer, config, summary_writer, metrics_manager, logger, callback=exp_callback
+                policy, replay_buffer, config, logger, callback
             )
 
             # create training worker
             training_worker = single_agent.SingleAgentTrainingWorker(
-                policy, replay_buffer, config, summary_writer, metrics_manager, logger, callback=exp_callback
+                policy, replay_buffer, config, logger, callback
             )
 
             # start execution
@@ -114,12 +114,12 @@ class Runner:
 
             # create rollout worker
             rollout_worker = multi_agent.RolloutWorkerCreator(
-                policies, replay_buffers, policy_mapping_fn, config, summary_writer, metrics_manager, logger
+                policies, replay_buffers, policy_mapping_fn, config, logger, callback
             )
 
             # create training worker
             training_worker = multi_agent.MultiAgentIndependentTrainingWorker(
-                policies, replay_buffers, policy_mapping_fn, config, summary_writer, metrics_manager, logger
+                policies, replay_buffers, policy_mapping_fn, config, logger, callback
             )
 
             # start execution

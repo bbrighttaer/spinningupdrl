@@ -16,15 +16,11 @@ class MultiAgentIndependentTrainingWorker(TrainingWorker):
                  replay_buffers: typing.Dict[constants.PolicyID, ReplayBuffer],
                  policy_mapping_fn: typing.Callable[[constants.PolicyID], constants.AgentID],
                  config: dict,
-                 summary_writer: SummaryWriter,
-                 metrics_manager: MetricsManager,
-                 logger, callback=None):
+                 logger, callback):
         self.policies = policies
         self.replay_buffers = replay_buffers
         self.policy_mapping_fn = policy_mapping_fn
         self.config = config
-        self.summary_writer = summary_writer
-        self.metrics_manager = metrics_manager
         self.logger = logger
         self.callback = callback
 
@@ -50,10 +46,11 @@ class MultiAgentIndependentTrainingWorker(TrainingWorker):
             learning_stats = policy.learn(samples)
 
             # update metrics
-            self.metrics_manager.add_learning_stats(
+            self.callback.on_learn_on_batch_end(
+                policy=policy,
                 cur_iter=cur_iter,
                 timestep=timestep,
-                data=learning_stats,
+                learning_stats=learning_stats,
                 label_suffix=policy_id
             )
 

@@ -1,8 +1,5 @@
-from torch.utils.tensorboard import SummaryWriter
-
 from algos import Policy
 from core import constants
-from core.metrics.sim_metrics import MetricsManager
 from core.proto.replay_buffer_proto import ReplayBuffer
 from core.proto.training_worker_proto import TrainingWorker
 
@@ -13,14 +10,10 @@ class SingleAgentTrainingWorker(TrainingWorker):
                  policy: Policy,
                  replay_buffer: ReplayBuffer,
                  config: dict,
-                 summary_writer: SummaryWriter,
-                 metrics_manager: MetricsManager,
-                 logger, callback=None):
+                 logger, callback):
         self.policy = policy
         self.replay = replay_buffer
         self.config = config
-        self.summary_writer = summary_writer
-        self.metrics_manager = metrics_manager
         self.logger = logger
         self.callback = callback
 
@@ -38,10 +31,11 @@ class SingleAgentTrainingWorker(TrainingWorker):
         learning_stats = self.policy.learn(samples)
 
         # update metrics
-        self.metrics_manager.add_learning_stats(
+        self.callback.on_learn_on_batch_end(
+            policy=self.policy,
             cur_iter=cur_iter,
             timestep=timestep,
-            data=learning_stats,
+            learning_stats=learning_stats,
         )
 
         # Replay buffer callback (e.g. on-policy buffer can be cleared at this stage)

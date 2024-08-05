@@ -14,7 +14,7 @@ TOTAL_TIME = "total time (s)"
 TRIAL_NAME = "trial name"
 
 # experience-related constants
-OBS = "observation"
+OBS = "obs"
 ACTION = "action"
 PREV_ACTION = "prev_action"
 NEXT_OBS = "next_obs"
@@ -24,6 +24,7 @@ NEXT_STATE = "next_state"
 DONE = "done"
 SEQ_MASK = "seq_mask"
 ACTION_MASK = "action_mask"
+NEXT_ACTION_MASK = "next_action_mask"
 RECEIVED_MESSAGE = "received_msg"
 SENT_MESSAGE = "sent_msg"
 HIDDEN_STATE = "hidden_state"
@@ -38,9 +39,10 @@ EVALUATION = "evaluation"
 LEARNING = "learning"
 
 # Environment-related values
-ENV_ACT_SPACE = "action_space"
+ENV_ACT_SPACE = "action"
 ENV_NUM_AGENTS = "number_of_agents"
-ENV_STATE_SPACE = "state_space"
+ENV_STATE_SPACE = "state"
+EPISODE_LIMIT = "episode_limit"
 
 # execution strategies
 COMM_BEFORE_ACTION_SELECTION_EXEC_STRATEGY = "comm_before_action"
@@ -50,6 +52,7 @@ DEFAULT_EXEC_STRATEGY = ACTION_AND_MESSAGE_SELECTION_EXEC_STRATEGY
 
 # Types
 NDArray = typing.TypeVar("NDArray")
+Number = typing.TypeVar("Number")  # int, float, long
 AgentID = str
 PolicyID = str
 

@@ -156,3 +156,44 @@ def save_policy_weights(policy, base_dir, checkpoint_count):
 def load_policy_weights(weights_file_path):
     weights = joblib.load(weights_file_path)
     return weights
+
+
+def get_smac_stats(
+        death_tracker_ally,
+        death_tracker_enemy,
+        battle_win_queue,
+        ally_survive_queue,
+        enemy_killing_queue) -> dict:
+    # SMAC metrics (from https://github.com/Replicable-MARL/MARLlib/blob/mq_dev/SMAC/metric/smac_callback.py)
+    smac_stats = {}
+    ally_state = death_tracker_ally
+    enemy_state = death_tracker_enemy
+
+    # count battle win rate in recent 100 games
+    if battle_win_queue.full():
+        battle_win_queue.get()  # pop FIFO
+
+    # compute win rate
+    battle_win_this_episode = int(all(enemy_state == 1))  # all enemy died / win
+    battle_win_queue.put(battle_win_this_episode)
+    smac_stats["battle_win_rate"] = sum(battle_win_queue.queue) / battle_win_queue.qsize()
+
+    # count ally survive in recent 100 games
+    if ally_survive_queue.full():
+        ally_survive_queue.get()  # pop FIFO
+
+    # compute ally survive rate
+    ally_survive_this_episode = sum(ally_state == 0) / ally_state.shape[0]  # all enemy died / win
+    ally_survive_queue.put(ally_survive_this_episode)
+    smac_stats["ally_survive_rate"] = sum(ally_survive_queue.queue) / ally_survive_queue.qsize()
+
+    # count enemy killing rate in recent 100 games
+    if enemy_killing_queue.full():
+        enemy_killing_queue.get()  # pop FIFO
+
+    # compute enemy kill rate
+    enemy_killing_this_episode = sum(enemy_state == 1) / enemy_state.shape[0]  # all enemy died / win
+    enemy_killing_queue.put(enemy_killing_this_episode)
+    smac_stats["enemy_kill_rate"] = sum(enemy_killing_queue.queue) / enemy_killing_queue.qsize()
+
+    return smac_stats

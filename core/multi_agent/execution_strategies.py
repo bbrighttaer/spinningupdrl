@@ -18,13 +18,13 @@ class RolloutWorkerExecutionStrategy(abc.ABC):
         self.policy_mapping_fn = rollout_worker.policy_mapping_fn
 
     @abc.abstractmethod
-    def __call__(self, env, obs, state, prev_actions, prev_hidden_states, prev_messages, explore, **kwargs):
+    def __call__(self, env, obs, state, action_mask, prev_actions, prev_hidden_states, prev_messages, explore, **kwargs):
         ...
 
 
 class DefaultExecutionStrategy(RolloutWorkerExecutionStrategy):
 
-    def __call__(self, env, obs, state, prev_actions, prev_hidden_states, prev_messages, explore, **kwargs):
+    def __call__(self, env, obs, state, action_mask, prev_actions, prev_hidden_states, prev_messages, explore, **kwargs):
         # get the observation message of every policy
         messages = {}
         for policy_id in self.policies:
@@ -33,6 +33,7 @@ class DefaultExecutionStrategy(RolloutWorkerExecutionStrategy):
             message = policy.get_message(
                 obs=obs[agent_id],
                 state=state[agent_id],
+                action_mask=action_mask,
                 prev_action=prev_actions[policy_id],
                 prev_msg=prev_messages[policy_id],
             )
@@ -57,26 +58,30 @@ class DefaultExecutionStrategy(RolloutWorkerExecutionStrategy):
                 prev_hidden_state=prev_hidden_states[policy_id],
                 explore=explore,
                 shared_messages=received_msgs[policy_id],
-                state=state.get(agent_id),
+                state=state[agent_id],
+                action_mask=action_mask[agent_id],
             )
             actions_dict[agent_id] = action
             hidden_states[policy_id] = hidden_state
 
         # send selected actions to environment
         next_obs, reward, done, truncated, info = env.step(actions_dict)
-        next_state = info.get(constants.NEXT_STATE)
         dones = {}
         for policy_id in self.policies.keys():
             agent_id = self.policy_mapping_fn(policy_id)
-            dones[policy_id] = (done.get("__all__") or done.get(agent_id)
-                               or truncated.get("__all__") or truncated.get(agent_id))
+            if "__all__" in done:
+                dones[policy_id] = done["__all__"]
+            else:
+                dones[policy_id] = done[agent_id]
 
         return {
             constants.OBS: obs,
-            constants.NEXT_OBS: self.worker.unpack_env_data(next_obs, constants.OBS),
-            constants.NEXT_STATE: self.worker.unpack_env_data(next_state, constants.STATE),
             constants.STATE: state,
+            constants.ACTION_MASK: action_mask,
             constants.REWARD: reward,
+            constants.NEXT_OBS: self.worker.unpack_env_data(next_obs, constants.OBS),
+            constants.NEXT_STATE: self.worker.unpack_env_data(next_obs, constants.STATE),
+            constants.NEXT_ACTION_MASK: self.worker.unpack_env_data(next_obs, constants.ACTION_MASK),
             constants.DONE: dones,
             constants.INFO: info,
             constants.HIDDEN_STATE: hidden_states,

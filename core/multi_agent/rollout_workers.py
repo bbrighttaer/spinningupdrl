@@ -19,11 +19,9 @@ def RolloutWorkerCreator(
         replay_buffers: typing.Dict[constants.PolicyID, ReplayBuffer],
         policy_mapping_fn: typing.Callable[[constants.PolicyID], constants.AgentID],
         config: dict,
-        summary_writer: SummaryWriter,
-        metrics_manager: MetricsManager,
         logger, callback=None) -> RolloutWorker:
     return SimpleMultiAgentRolloutWorker(
-        policies, replay_buffers, policy_mapping_fn, config, summary_writer, metrics_manager, logger, callback,
+        policies, replay_buffers, policy_mapping_fn, config, logger, callback,
     )
 
 
@@ -34,15 +32,11 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
                  replay_buffers: typing.Dict[constants.PolicyID, ReplayBuffer],
                  policy_mapping_fn: typing.Callable[[constants.PolicyID], constants.AgentID],
                  config: dict,
-                 summary_writer: SummaryWriter,
-                 metrics_manager: MetricsManager,
                  logger, callback):
         self.policies = policies
         self.replay_buffers = replay_buffers
         self.policy_mapping_fn = policy_mapping_fn
         self.config = config
-        self.summary_writer = summary_writer
-        self.metrics_manager = metrics_manager
         self.logger = logger
         self.callback = callback
         self._timestep = 0
@@ -79,7 +73,9 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
         for policy_id in self.policies.keys():
             agent_id = self.policy_mapping_fn(policy_id)
             if env_data is not None:
-                agent_data = utils.to_numpy_array(env_data[agent_id][data_key])
+                agent_data = utils.to_numpy_array(env_data[agent_id].get(data_key))
+                if agent_data is None:
+                    agent_data = []
             else:
                 agent_data = None
             data[agent_id] = agent_data
@@ -87,9 +83,10 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
 
     def generate_trajectory(self):
         self._cur_iter += 1
-        obs, info = self.env.reset()
-        obs = self.unpack_env_data(obs, constants.OBS)
-        state = self.unpack_env_data(info.get(constants.STATE), constants.STATE)
+        raw_obs, info = self.env.reset()
+        obs = self.unpack_env_data(raw_obs, constants.OBS)
+        state = self.unpack_env_data(raw_obs, constants.STATE)
+        action_mask = self.unpack_env_data(raw_obs, constants.ACTION_MASK)
         done = False
         episode_len = 0
         episode_reward = 0
@@ -109,6 +106,7 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
                 env=self.env,
                 obs=obs,
                 state=state,
+                action_mask=action_mask,
                 prev_actions=prev_act,
                 prev_hidden_states=prev_hidden_states,
                 prev_messages=prev_messages,
@@ -121,27 +119,25 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
                 agent_id = self.policy_mapping_fn(policy_id)
                 experience = {
                     constants.OBS: results[constants.OBS][agent_id],
+                    constants.STATE: results[constants.STATE][agent_id],
+                    constants.ACTION_MASK: results[constants.ACTION_MASK][agent_id],
                     constants.ACTION: results[constants.ACTION][policy_id],
                     constants.REWARD: results[constants.REWARD][agent_id],
                     constants.NEXT_OBS: results[constants.NEXT_OBS][agent_id],
+                    constants.NEXT_STATE: results[constants.NEXT_STATE][agent_id],
+                    constants.NEXT_ACTION_MASK: results[constants.NEXT_ACTION_MASK][agent_id],
                     constants.DONE: results[constants.DONE][policy_id],
                     constants.PREV_ACTION: prev_act[policy_id],
                     constants.SENT_MESSAGE: results[constants.SENT_MESSAGE][policy_id],
                     constants.RECEIVED_MESSAGE: results[constants.RECEIVED_MESSAGE][policy_id],
                     constants.SEQ_MASK: False,
                 }
-                state = results[constants.STATE]
-                next_state = results[constants.NEXT_STATE]
-                if state and next_state:
-                    experience.update({
-                        constants.STATE: state[agent_id],
-                        constants.NEXT_STATE: next_state[agent_id],
-                    })
                 policy_episode.add(**experience)
 
             # timestep props update
             obs = results[constants.NEXT_OBS]
             state = results[constants.NEXT_STATE]
+            action_mask = results[constants.NEXT_ACTION_MASK]
             prev_act = results[constants.ACTION]
             prev_hidden_states = results[constants.HIDDEN_STATE]
             done = bool(sum(results[constants.DONE].values()))
@@ -160,17 +156,25 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
             replay_buffer = self.replay_buffers[policy_id]
             replay_buffer.add(policies_episode[policy_id])
 
-        # record stats
-        self._log_metrics(episode_len, episode_reward, constants.TRAINING)
+        # record metrics
+        self.callback.on_episode_end(
+            worker=self,
+            is_training=True,
+            episode_stats={
+                metrics.PerformanceMetrics.EPISODE_LENGTH: episode_len,
+                metrics.PerformanceMetrics.EPISODE_REWARD: episode_reward,
+            }
+        )
 
     def evaluate_policy(self, num_episodes: int, render=False):
         eval_episode_lens = []
         eval_episode_rewards = []
 
         for i in range(num_episodes):
-            obs, info = self.env.reset()
-            obs = self.unpack_env_data(obs, constants.OBS)
-            state = self.unpack_env_data(info.get(constants.STATE), constants.STATE)
+            raw_obs, info = self.env.reset()
+            obs = self.unpack_env_data(raw_obs, constants.OBS)
+            state = self.unpack_env_data(raw_obs, constants.STATE)
+            action_mask = self.unpack_env_data(raw_obs, constants.ACTION_MASK)
             done = False
             episode_len = 0
             episode_reward = 0
@@ -191,6 +195,7 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
                 results = self.timestep_execution_strategy(
                     env=self.env,
                     obs=obs,
+                    action_mask=action_mask,
                     state=state,
                     prev_actions=prev_act,
                     prev_hidden_states=prev_hidden_states,
@@ -201,6 +206,7 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
                 # timestep props update
                 obs = results[constants.NEXT_OBS]
                 state = results[constants.NEXT_STATE]
+                action_mask = results[constants.NEXT_ACTION_MASK]
                 prev_act = results[constants.ACTION]
                 prev_hidden_states = results[constants.HIDDEN_STATE]
                 done = bool(sum(results[constants.DONE].values()))
@@ -215,22 +221,16 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
             eval_episode_rewards.append(episode_reward)
 
         episode_reward_mean = np.mean(eval_episode_rewards)
-        self._log_metrics(
-            episode_len=np.mean(eval_episode_lens),
-            episode_reward=episode_reward_mean,
-            mode=constants.EVALUATION,
+
+        # record metrics
+        self.callback.on_episode_end(
+            worker=self,
+            is_training=False,
+            episode_stats={
+                metrics.PerformanceMetrics.EPISODE_LENGTH: np.mean(eval_episode_lens),
+                metrics.PerformanceMetrics.EPISODE_REWARD: episode_reward_mean,
+            }
         )
 
         # return flag for terminating the trial if target has been reached
         return self.config[constants.RUNNING_CONFIG].episode_reward_mean_goal <= episode_reward_mean
-
-    def _log_metrics(self, episode_len, episode_reward, mode):
-        self.metrics_manager.add_performance_metric(
-            data={
-                metrics.PerformanceMetrics.EPISODE_REWARD: episode_reward,
-                metrics.PerformanceMetrics.EPISODE_LENGTH: episode_len
-            },
-            cur_iter=self.cur_iter,
-            timestep=self.timestep,
-            training=mode == constants.TRAINING,
-        )

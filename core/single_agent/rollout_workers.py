@@ -1,11 +1,9 @@
 import gymnasium as gym
 import numpy as np
-from torch.utils.tensorboard import SummaryWriter
 
 from algos import Policy
 from core import constants, metrics, utils
 from core.buffer.episode import Episode
-from core.metrics.sim_metrics import MetricsManager
 from core.proto.replay_buffer_proto import ReplayBuffer
 from core.proto.rollout_worker_proto import RolloutWorker
 
@@ -14,10 +12,8 @@ def RolloutWorkerCreator(
         policy: Policy,
         replay_buffer: ReplayBuffer,
         config: dict,
-        summary_writer: SummaryWriter,
-        metrics_manager: MetricsManager,
-        logger, callback=None) -> RolloutWorker:
-    return SimpleRolloutWorker(policy, replay_buffer, config, summary_writer, metrics_manager, logger, callback)
+        logger, callback) -> RolloutWorker:
+    return SimpleRolloutWorker(policy, replay_buffer, config, logger, callback)
 
 
 class SimpleRolloutWorker(RolloutWorker):
@@ -26,14 +22,10 @@ class SimpleRolloutWorker(RolloutWorker):
                  policy: Policy,
                  replay_buffer: ReplayBuffer,
                  config: dict,
-                 summary_writer: SummaryWriter,
-                 metrics_manager: MetricsManager,
                  logger, callback):
         self.policy = policy
         self.replay_buffer = replay_buffer
         self.config = config
-        self.summary_writer = summary_writer
-        self.metrics_manager = metrics_manager
         self.logger = logger
         self.callback = callback
         self._timestep = 0
@@ -110,7 +102,15 @@ class SimpleRolloutWorker(RolloutWorker):
 
         self.replay_buffer.add(episode)
 
-        self._log_metrics(episode_len, episode_reward, constants.TRAINING)
+        # record metrics
+        self.callback.on_episode_end(
+            worker=self,
+            is_training=True,
+            episode_stats={
+                metrics.PerformanceMetrics.EPISODE_LENGTH: episode_len,
+                metrics.PerformanceMetrics.EPISODE_REWARD: episode_reward,
+            }
+        )
 
     def evaluate_policy(self, num_episodes: int, render=False):
         eval_episode_lens = []
@@ -152,22 +152,16 @@ class SimpleRolloutWorker(RolloutWorker):
             eval_episode_rewards.append(episode_reward)
 
         episode_reward_mean = np.mean(eval_episode_rewards)
-        self._log_metrics(
-            episode_len=np.mean(eval_episode_lens),
-            episode_reward=episode_reward_mean,
-            mode=constants.EVALUATION,
+
+        # record metrics
+        self.callback.on_episode_end(
+            worker=self,
+            is_training=False,
+            episode_stats={
+                metrics.PerformanceMetrics.EPISODE_LENGTH: np.mean(eval_episode_lens),
+                metrics.PerformanceMetrics.EPISODE_REWARD: episode_reward_mean,
+            }
         )
 
         # return flag for terminating the trial if target has been reached
         return self.config[constants.RUNNING_CONFIG].episode_reward_mean_goal <= episode_reward_mean
-
-    def _log_metrics(self, episode_len, episode_reward, mode):
-        self.metrics_manager.add_performance_metric(
-            data={
-                metrics.PerformanceMetrics.EPISODE_REWARD: episode_reward,
-                metrics.PerformanceMetrics.EPISODE_LENGTH: episode_len
-            },
-            cur_iter=self.cur_iter,
-            timestep=self.timestep,
-            training=mode == constants.TRAINING,
-        )
