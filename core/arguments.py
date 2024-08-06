@@ -43,21 +43,18 @@ def cmd_arguments():
     parser.add_argument(
         "--total_timesteps",
         type=int,
-        default=1000000,
         help="Total number of time steps of the experiment."
     )
 
     parser.add_argument(
         "--evaluation_interval",
         type=int,
-        default=10000,
         help="Number of training time steps before an evaluation phase."
     )
 
     parser.add_argument(
         "--evaluation_num_episodes",
         type=int,
-        default=20,
         help="The number of episodes to run per each evaluation phase."
     )
 

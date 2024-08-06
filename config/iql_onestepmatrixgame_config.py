@@ -5,6 +5,8 @@ RUNNING_CONFIG = {
     "checkpoint_freq": 1000,
     "episode_reward_mean_goal": 1000,
     "max_timesteps_per_episode": 1000,
+    "evaluation_interval": 1000,
+    "evaluation_num_episodes": 20,
 }
 ALGO_CONFIG = {
     "buffer_size": 5000,
@@ -19,8 +21,6 @@ ALGO_CONFIG = {
     "learning_rate": 0.0005,
     "grad_clip": 10,
     "tau": 0.7,
-    "alpha": 0.9,
-    "beta": 0.1,
     "reward_normalization": True,
     "show_reward_dist": True,
     "comm_size": 0,  # size or dimension of a message (if communication is enabled)

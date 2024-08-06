@@ -146,8 +146,8 @@ class Runner:
         while rollout_worker.timestep < running_config.total_timesteps and not early_stopping:
             # check for evaluation step
             timestep = rollout_worker.timestep
-            if timestep > (self.cmd_args.evaluation_interval + last_eval_step):
-                early_stopping = rollout_worker.evaluate_policy(self.cmd_args.evaluation_num_episodes)
+            if timestep > (running_config.evaluation_interval + last_eval_step):
+                early_stopping = rollout_worker.evaluate_policy(running_config.evaluation_num_episodes)
                 last_eval_step = timestep
 
             # generate an episode

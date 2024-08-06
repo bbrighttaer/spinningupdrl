@@ -6,6 +6,8 @@ RUNNING_CONFIG = {
     "checkpoint_freq": 10000,
     "episode_reward_mean_goal": 1000,
     "max_timesteps_per_episode": 1000,
+    "evaluation_interval": 10000,
+    "evaluation_num_episodes": 20,
 }
 ALGO_CONFIG = {
     "buffer_size": 5000,
@@ -14,7 +16,7 @@ ALGO_CONFIG = {
     "final_epsilon": 0.05,
     "epsilon_timesteps": 50000,
     "training_batch_size": 32,
-    "replay_start_size": 10,
+    "replay_start_size": 1000,
     "gamma": 0.99,
     "target_update_freq": 200,
     "optimizer": "rmsprop",

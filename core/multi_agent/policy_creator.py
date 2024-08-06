@@ -5,10 +5,11 @@ from typing import Optional
 import gymnasium as gym
 
 from algos import ALGO_REGISTRY, Policy
-from core import constants
+from core import constants, utils
 from core.buffer.replay_buffer import ReplayBuffer
 from core.constants import AgentID, PolicyID
 from core.envs.base_env import MultiAgentEnv
+from core.envs.ma_gym_wrapper import MAGymEnvWrapper
 from core.proto.multi_agent_policy_mapping_proto import MultiAgentPolicyMapping
 
 
@@ -17,10 +18,20 @@ def MultiAgentIndependentPolicyCreator(
 ) -> typing.Tuple[typing.Dict[str, Policy], typing.Dict[str, ReplayBuffer], typing.Callable[[AgentID], PolicyID]]:
     config = copy.deepcopy(config)
     env_config = config[constants.ENV_CONFIG]
-    env = gym.make(**env_config, disable_env_checker=True)
-    assert isinstance(env.unwrapped, MultiAgentEnv), "A MultiAgentEnv environment type is required"
-    assert isinstance(env.observation_space, gym.spaces.Dict), ("Observation space of multi-agent env should "
-                                                                "be gym.spaces.Dict, with agent IDs as the keys")
+
+    # make the env to get env info
+    env = utils.make_multi_agent_env(**env_config)
+
+    # multi-agent env check
+    if not (isinstance(env, MAGymEnvWrapper) or isinstance(env.unwrapped, MultiAgentEnv)):
+        raise RuntimeError("A MultiAgentEnv environment type is required")
+    obs_space = env.observation_space
+    if not isinstance(obs_space, gym.spaces.Dict):
+        raise RuntimeError(
+            "Observation space of multi-agent env should be "
+            "gym.spaces.Dict, with agent IDs as the keys"
+        )
+
     env_info = env.unwrapped.get_env_info()
     policy_mapping = {}
     replay_buffer_mapping = {}
@@ -33,7 +44,7 @@ def MultiAgentIndependentPolicyCreator(
         buffer = None
     for i in range(n_agents):
         policy_id = f"policy_{i}"
-        env_config[constants.OBS] = copy.deepcopy(env.observation_space[f"agent_{i}"])
+        env_config[constants.OBS] = copy.deepcopy(obs_space[f"agent_{i}"])
         env_config[constants.ENV_ACT_SPACE] = copy.deepcopy(env.action_space)
         if buffer is None:
             buffer = ReplayBuffer(buffer_size, policy_id="default")

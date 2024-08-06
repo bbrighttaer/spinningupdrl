@@ -1,14 +1,11 @@
 import collections
 import typing
 
-import gymnasium as gym
 import numpy as np
-from torch.utils.tensorboard import SummaryWriter
 
 from algos import Policy
 from core import constants, metrics, utils
 from core.buffer.episode import Episode
-from core.metrics.sim_metrics import MetricsManager
 from core.multi_agent import execution_strategies
 from core.proto.replay_buffer_proto import ReplayBuffer
 from core.proto.rollout_worker_proto import RolloutWorker
@@ -52,7 +49,7 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
         self.timestep_execution_strategy = strategy_type(self)
 
     def create_env(self):
-        self.env = gym.make(**self.config[constants.ENV_CONFIG], disable_env_checker=True)
+        self.env = utils.make_multi_agent_env(**self.config[constants.ENV_CONFIG])
 
     @property
     def timestep(self):

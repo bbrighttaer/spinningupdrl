@@ -5,6 +5,8 @@ RUNNING_CONFIG = {
     "checkpoint_freq": 1000,
     "episode_reward_mean_goal": 1000,
     "max_timesteps_per_episode": 1000,
+    "evaluation_interval": 1000,
+    "evaluation_num_episodes": 20,
 }
 ALGO_CONFIG = {
     "buffer_size": 5000,

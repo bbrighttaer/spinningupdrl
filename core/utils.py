@@ -4,6 +4,9 @@ import os
 import random
 import string
 
+import gymnasium
+import gym
+
 import joblib
 import numpy as np
 import torch.nn
@@ -112,7 +115,7 @@ def to_numpy_array(x, dtype=np.float32):
         return
 
     if isinstance(x, np.ndarray):
-        return x.astype(np.float32)
+        return x.astype(dtype)
     elif type(x) in [list, set, tuple]:
         return np.array(x, dtype=dtype)
     else:
@@ -156,6 +159,16 @@ def save_policy_weights(policy, base_dir, checkpoint_count):
 def load_policy_weights(weights_file_path):
     weights = joblib.load(weights_file_path)
     return weights
+
+
+def make_multi_agent_env(**kwargs):
+    try:
+        env = gymnasium.make(**kwargs, disable_env_checker=True)
+    except gymnasium.error.NameNotFound:  # check if env is in ma_gym envs
+        from core.envs.ma_gym_wrapper import MAGymEnvWrapper
+        env = gym.make(**kwargs)
+        env = MAGymEnvWrapper(env)
+    return env
 
 
 def get_smac_stats(
