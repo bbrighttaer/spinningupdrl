@@ -133,7 +133,10 @@ class MetricsManager:
             for col in row_data:
                 if constants.EVALUATION not in col:
                     field_names.append(col)
-                    field_values.append(row_data[col][0])
+                    value = row_data[col][0]
+                    if isinstance(value, float):
+                        value = round(value, 3)
+                    field_values.append(value)
 
             info = PrettyTable(field_names=field_names)
             info.add_row(field_values)

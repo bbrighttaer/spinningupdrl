@@ -11,7 +11,7 @@ RUNNING_CONFIG = {
 }
 ALGO_CONFIG = {
     "buffer_size": 5000,
-    "buffer_policy": constants.INDIVIDUAL_BUFFER,
+    "buffer_policy": constants.SHARED_BUFFER,
     "epsilon": 1.0,
     "final_epsilon": 0.05,
     "epsilon_timesteps": 2000,
@@ -38,6 +38,8 @@ MODEL_CONFIG = {
     "num_rnn_layers": 1,
     "activation": "relu",
     "dropout_rate": 0.,
+    "vae_hidden_layers": [64],
+    "vae_latent_dim": 8,
 }
 ENV_CONFIG = {
 }

@@ -3,6 +3,7 @@ from .sample import SamplePolicy
 from .dqn import DQNPolicy
 from .bql import BQLPolicy
 from .hiql import HIQLPolicy
+from .wbql import WBQLPolicy
 
 ALGO_REGISTRY = {
     "sample": SamplePolicy,
@@ -10,4 +11,5 @@ ALGO_REGISTRY = {
     "bql": BQLPolicy,
     "hiql": HIQLPolicy,
     "iql": DQNPolicy,
+    "wbql": WBQLPolicy,
 }

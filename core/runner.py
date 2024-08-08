@@ -163,7 +163,7 @@ class Runner:
                 utils.save_policy_weights(policy, working_dir, checkpoint_count)
 
         # completion protocol
-        rollout_worker.evaluate_policy(self.cmd_args.evaluation_num_episodes)
+        rollout_worker.evaluate_policy(running_config.evaluation_num_episodes)
         utils.save_policy_weights(policy, working_dir, checkpoint_count + 1)
 
     def render(self, config, policy, rollout_worker):

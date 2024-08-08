@@ -210,3 +210,16 @@ def get_smac_stats(
     smac_stats["enemy_kill_rate"] = sum(enemy_killing_queue.queue) / enemy_killing_queue.qsize()
 
     return smac_stats
+
+
+def shift_and_scale(x):
+    # Find the minimum value
+    x_min = x.min()
+
+    # Shift the vector to make all elements non-negative
+    x_shifted = (x - x_min) + 1e-4
+
+    # Normalise to [0, 1]
+    x_scaled = x_shifted / (x_shifted.max() + 1e-7)
+
+    return x_scaled
