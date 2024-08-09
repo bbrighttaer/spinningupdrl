@@ -223,3 +223,15 @@ def shift_and_scale(x):
     x_scaled = x_shifted / (x_shifted.max() + 1e-7)
 
     return x_scaled
+
+
+def apply_scaling(vector):
+    # Compute scaling factor
+    scaling = len(vector) / vector.sum()
+
+    # Scale the vector
+    vector *= scaling
+
+    # Normalise to [0, 1]
+    vector /= (vector.max() + 1e-7)
+    return vector

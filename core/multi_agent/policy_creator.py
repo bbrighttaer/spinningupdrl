@@ -39,15 +39,18 @@ def MultiAgentIndependentPolicyCreator(
     n_agents = env_info[constants.ENV_NUM_AGENTS]
     buffer_size = config[constants.ALGO_CONFIG].buffer_size
     if config[constants.ALGO_CONFIG].buffer_policy == constants.SHARED_BUFFER:
-        buffer = ReplayBuffer(buffer_size, policy_id="default")
+        shared_buffer = ReplayBuffer(buffer_size, policy_id="default")
     else:
-        buffer = None
+        shared_buffer = None
     for i in range(n_agents):
         policy_id = f"policy_{i}"
         env_config[constants.OBS] = copy.deepcopy(obs_space[f"agent_{i}"])
         env_config[constants.ENV_ACT_SPACE] = copy.deepcopy(env.action_space)
-        if buffer is None:
+        env_config[constants.ENV_NUM_AGENTS] = n_agents
+        if shared_buffer is None:
             buffer = ReplayBuffer(buffer_size, policy_id="default")
+        else:
+            buffer = shared_buffer
         replay_buffer_mapping[policy_id] = buffer
         policy_class = ALGO_REGISTRY[config[constants.ALGO_CONFIG].algo]
         policy_mapping[policy_id] = policy_class(config, summary_writer, logger, policy_id=policy_id)

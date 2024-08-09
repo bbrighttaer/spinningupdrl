@@ -37,8 +37,8 @@ MODEL_CONFIG = {
     "num_rnn_layers": 1,
     "activation": "relu",
     "dropout_rate": 0.,
-    "vae_hidden_layers": [64],
-    "vae_latent_dim": 8,
+    "vae_hidden_layers": [128],
+    "vae_latent_dim": 16,
 }
 ENV_CONFIG = {
     "id": "PredatorPrey7x7-v0",

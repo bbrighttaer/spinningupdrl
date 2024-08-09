@@ -69,7 +69,9 @@ class Policy(abc.ABC):
         self.model_config["n_actions"] = self.n_actions
         self.model_config["num_discrete_obs"] = self.num_discrete_obs
         self.model_config["comm_size"] = self.algo_config.comm_size
+        self.model_config["n_agents"] = config[constants.ENV_CONFIG][constants.ENV_NUM_AGENTS]
         self.model_config["discrete_comm_space_size"] = self.algo_config.discrete_comm_space_size
+        self.model_config["msg_aggregation_type"] = self.algo_config.msg_aggregation_type
 
     @abc.abstractmethod
     def get_initial_hidden_state(self):
@@ -99,5 +101,7 @@ class Policy(abc.ABC):
         msg = np.zeros((comm_size,)) if comm_size else []
         return msg
 
-    def get_message(self, obs, state, prev_action, prev_msg, **kwargs) -> typing.List | constants.NDArray:
+    def get_message(
+            self, obs, state, prev_msg, **kwargs
+    ) -> typing.List | constants.NDArray:
         return self.get_initial_message()

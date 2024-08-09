@@ -26,7 +26,9 @@ SEQ_MASK = "seq_mask"
 ACTION_MASK = "action_mask"
 NEXT_ACTION_MASK = "next_action_mask"
 RECEIVED_MESSAGE = "received_msg"
+NEXT_RECEIVED_MESSAGE = "next_received_msg"
 SENT_MESSAGE = "sent_msg"
+NEXT_SENT_MESSAGE = "next_sent_msg"
 HIDDEN_STATE = "hidden_state"
 INFO = "info"
 
@@ -60,3 +62,7 @@ PolicyID = str
 # Replay buffer policies
 SHARED_BUFFER = "shared_replay_buffer"
 INDIVIDUAL_BUFFER = "individual_replay_buffer"
+
+# communication
+CONCATENATE_MSGS = "concatenate_received_msgs"
+PROJECT_MSGS = "project_shared_msgs"

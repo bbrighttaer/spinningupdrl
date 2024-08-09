@@ -3,7 +3,7 @@
 import torch
 import torch.nn as nn
 
-from core import utils
+from core import utils, constants
 from core.modules.base import TorchModel
 from core.utils import DotDic
 
@@ -13,10 +13,18 @@ class SimpleRNN(TorchModel):
     def __init__(self, config: DotDic):
         super().__init__(config)
         activation = utils.get_activation_function(self.model_config["activation"])
+        input_dim = self.obs_dim
+
+        # add comm dim if comm is enabled
+        if self.comm_dim:
+            if self.model_config.msg_aggregation_type == constants.CONCATENATE_MSGS:
+                agg_msgs_dim = self.comm_dim * (self.model_config.n_agents - 1)
+                input_dim += self.comm_dim + agg_msgs_dim
+            elif self.model_config.msg_aggregation_type == constants.PROJECT_MSGS:
+                input_dim += self.comm_dim + self.model_config.agg_msgs_dim
 
         # encoder
         enc_layers = []
-        input_dim = self.obs_dim
         for hdim in self.model_config.encoder_layers[:-1]:
             enc_layers.extend([
                 nn.Linear(input_dim, hdim),

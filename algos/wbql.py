@@ -54,6 +54,12 @@ class WBQLPolicy(Policy):
             latent_dim=self.model_config.vae_latent_dim,
             action_lookup=self.model_config.vae_use_action_lookup,
         ).to(self.device)
+        self.target_vae = VariationalAE(
+            input_dim=self.obs_size + 1,
+            hidden_layer_dims=self.model_config.vae_hidden_layers,
+            latent_dim=self.model_config.vae_latent_dim,
+            action_lookup=self.model_config.vae_use_action_lookup,
+        ).to(self.device)
 
         # create optimizers
         self.params = list(self.model.parameters()) + list(self.aux_model.parameters())
@@ -85,13 +91,15 @@ class WBQLPolicy(Policy):
 
     def update_target(self):
         utils.soft_update(self.aux_target_model, self.aux_model, self.config[constants.ALGO_CONFIG].tau)
+        utils.soft_update(self.target_vae, self.vae, self.config[constants.ALGO_CONFIG].tau)
 
     def get_weights(self):
         return {
             "model": utils.tensor_state_dict_to_numpy_state_dict(self.model.state_dict()),
             "aux_model": utils.tensor_state_dict_to_numpy_state_dict(self.aux_model.state_dict()),
             "aux_target_model": utils.tensor_state_dict_to_numpy_state_dict(self.aux_target_model.state_dict()),
-            "vae": utils.tensor_state_dict_to_numpy_state_dict(self.vae.state_dict())
+            "vae": utils.tensor_state_dict_to_numpy_state_dict(self.vae.state_dict()),
+            "target_vae": utils.tensor_state_dict_to_numpy_state_dict(self.target_vae.state_dict())
         }
 
     def set_weights(self, weights):
@@ -110,6 +118,10 @@ class WBQLPolicy(Policy):
         if "vae" in weights:
             self.vae.load_state_dict(
                 utils.numpy_state_dict_to_tensor_state_dict(weights["vae"], self.device)
+            )
+        if "target_vae" in weights:
+            self.target_vae.load_state_dict(
+                utils.numpy_state_dict_to_tensor_state_dict(weights["target_vae"], self.device)
             )
 
     @torch.no_grad()
@@ -161,34 +173,21 @@ class WBQLPolicy(Policy):
             # select samples
             subset_size = self.algo_config.kde_subset_size or 100
 
-            # get distribution params
-            z, mu, logvar = self.vae.encode(x)
-
             # compute Q(x)
-            q_x = kde.kde_density(
-                samples=z,
-                mus=mu,
-                logvars=logvar,
-                num_samples=subset_size,
-                approx=False
-            )
+            # q densities
+            outputs, mu, logvar = self.vae.encode(x)
+            q_densities = kde.kde_density(outputs, mu, logvar, subset_size)
+            q_densities = utils.apply_scaling(q_densities)
 
             # compute P(x)
             targets_scaled = utils.shift_and_scale(target_q_values)
-            p_x = kde.kde_density(
-                samples=z,
-                mus=mu,
-                logvars=logvar,
-                num_samples=subset_size,
-                weights=targets_scaled,
-                approx=False
-            )
+            target_outputs, target_mu, target_logvar = self.target_vae.encode(x)
+            p_densities = targets_scaled / kde.kde_density(target_outputs, target_mu, target_logvar, subset_size)
+            p_densities /= (p_densities.max() + EPS)
 
             # compute weights
-            p_x_inv = 1 / (p_x + EPS)
-            p_x_inv = p_x_inv / (p_x_inv.max() + EPS)
-            wts = p_x_inv / (q_x + EPS)
-            weights = wts / (wts.max() + EPS)
+            weights = p_densities / q_densities
+            weights = utils.apply_scaling(weights)
             weights = weights.view(B, T, 1)
             return weights
 
