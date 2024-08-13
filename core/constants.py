@@ -31,6 +31,7 @@ SENT_MESSAGE = "sent_msg"
 NEXT_SENT_MESSAGE = "next_sent_msg"
 HIDDEN_STATE = "hidden_state"
 INFO = "info"
+EXPLORATION_FACTOR = "exploration_factor"
 
 # Experiment modes
 SINGLE_AGENT = "sa"

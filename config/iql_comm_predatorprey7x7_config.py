@@ -6,7 +6,7 @@ RUNNING_CONFIG = {
     "checkpoint_freq": 10000,
     "episode_reward_mean_goal": 1000,
     "max_timesteps_per_episode": 1000,
-    "evaluation_interval": 10000,
+    "evaluation_interval": 1000,
     "evaluation_num_episodes": 20,
 }
 ALGO_CONFIG = {
@@ -15,7 +15,7 @@ ALGO_CONFIG = {
     "final_epsilon": 0.05,
     "epsilon_timesteps": 50000,
     "training_batch_size": 32,
-    "replay_start_size": 1000,
+    "replay_start_size": 100,
     "gamma": 0.99,
     "target_update_freq": 200,
     "optimizer": "rmsprop",
@@ -25,7 +25,8 @@ ALGO_CONFIG = {
     "reward_normalization": False,
     "comm_size": 10,  # size or dimension of a message (if communication is enabled)
     "discrete_comm_space_size": 5,  # the size of the message space when using discrete communication
-    "msg_aggregation_type": constants.CONCATENATE_MSGS
+    "msg_aggregation_type": constants.CONCATENATE_MSGS,
+    "use_timestep_fingerprint": False
 }
 MODEL_CONFIG = {
     "core_arch": "rnn",

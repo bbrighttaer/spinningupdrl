@@ -16,7 +16,7 @@ ALGO_CONFIG = {
     "final_epsilon": 0.05,
     "epsilon_timesteps": 2000,
     "training_batch_size": 32,
-    "replay_start_size": 500,
+    "replay_start_size": 100,
     "gamma": 1.,
     "target_update_freq": 200,
     "optimizer": "rmsprop",

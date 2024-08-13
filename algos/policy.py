@@ -36,6 +36,7 @@ class Policy(abc.ABC):
         self.logger = logger
         self.policy_id = policy_id  # only relevant in the multi-agent case
         self.global_timestep = 0
+        self.fp_size = 2 if self.algo_config.use_timestep_fingerprint else 0
 
         # action space should either be discrete or box
         self.act_space = config[constants.ENV_CONFIG][constants.ENV_ACT_SPACE]
@@ -66,6 +67,7 @@ class Policy(abc.ABC):
         # update configs
         self.model_config["state_size"] = self.state_size
         self.model_config["obs_size"] = self.obs_size
+        self.model_config["fp_size"] = self.fp_size
         self.model_config["n_actions"] = self.n_actions
         self.model_config["num_discrete_obs"] = self.num_discrete_obs
         self.model_config["comm_size"] = self.algo_config.comm_size

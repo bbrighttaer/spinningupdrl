@@ -13,7 +13,7 @@ class SimpleRNN(TorchModel):
     def __init__(self, config: DotDic):
         super().__init__(config)
         activation = utils.get_activation_function(self.model_config["activation"])
-        input_dim = self.obs_dim
+        input_dim = self.obs_dim + self.fp_dim
 
         # add comm dim if comm is enabled
         if self.comm_dim:

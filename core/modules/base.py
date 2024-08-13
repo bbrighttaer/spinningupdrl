@@ -8,6 +8,7 @@ class TorchModel(nn.Module):
     def __init__(self, config: DotDic):
         super().__init__()
         self.obs_dim = config.obs_size
+        self.fp_dim = config.fp_size
         self.action_dim = config.n_actions
         self.comm_dim = config.comm_size
         self.state_dim = config.state_size

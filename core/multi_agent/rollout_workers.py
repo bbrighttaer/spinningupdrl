@@ -129,6 +129,8 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
                     constants.NEXT_SENT_MESSAGE: results[constants.NEXT_SENT_MESSAGE][policy_id],
                     constants.RECEIVED_MESSAGE: results[constants.RECEIVED_MESSAGE][policy_id],
                     constants.NEXT_RECEIVED_MESSAGE: results[constants.NEXT_RECEIVED_MESSAGE][policy_id],
+                    constants.TIMESTEP: results[constants.TIMESTEP][policy_id],
+                    constants.EXPLORATION_FACTOR: results[constants.EXPLORATION_FACTOR][policy_id],
                     constants.SEQ_MASK: False,
                 }
                 policy_episode.add(**experience)

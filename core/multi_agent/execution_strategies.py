@@ -31,6 +31,8 @@ class DefaultExecutionStrategy(RolloutWorkerExecutionStrategy):
         # action selection
         actions_dict = {}
         hidden_states = {}
+        timestep_hist = {}
+        exploration_factor = {}
         for policy_id in self.policies:
             policy = self.policies[policy_id]
             agent_id = self.policy_mapping_fn(policy_id)
@@ -45,6 +47,13 @@ class DefaultExecutionStrategy(RolloutWorkerExecutionStrategy):
             )
             actions_dict[agent_id] = action
             hidden_states[policy_id] = hidden_state
+            timestep_hist[policy_id] = policy.global_timestep
+            # if using epsilon-greedy
+            if hasattr(policy, "exploration") and hasattr(policy.exploration, "epsilon_schedule"):
+                eps = policy.exploration.epsilon_schedule.value(policy.global_timestep)
+            else:
+                eps = 0
+            exploration_factor[policy_id] = eps
 
         # send selected actions to environment
         env_next_obs, reward, done, truncated, info = env.step(actions_dict)
@@ -88,6 +97,8 @@ class DefaultExecutionStrategy(RolloutWorkerExecutionStrategy):
             constants.NEXT_SENT_MESSAGE: messages_tp1,
             constants.RECEIVED_MESSAGE: received_msgs_t,
             constants.NEXT_RECEIVED_MESSAGE: received_msgs_tp1,
+            constants.TIMESTEP: timestep_hist,
+            constants.EXPLORATION_FACTOR: exploration_factor
         }
 
     def _get_agent_messages(self, obs, state, prev_messages, use_target=False):

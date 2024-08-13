@@ -110,6 +110,12 @@ class IQLCommPolicy(Policy):
         local_msg, _ = self.comm_net(obs_tensor, prev_hidden_state)
         obs_tensor = torch.cat([obs_tensor, local_msg, messages], dim=-1)
 
+        # fingerprint
+        if self.algo_config.use_timestep_fingerprint:
+            fp = np.array([self.global_timestep, self.exploration.epsilon_schedule.value(self.global_timestep)])
+            fp = utils.convert_to_tensor(fp, self.device).float().view(1, -1)
+            obs_tensor = torch.cat([obs_tensor, fp], dim=-1)
+
         # convert hidden states to tensor
         hidden_states = [utils.convert_to_tensor(h, self.device) for h in prev_hidden_state]
 
@@ -137,6 +143,8 @@ class IQLCommPolicy(Policy):
 
     def learn(self, samples: sample_batch.SampleBatch) -> LearningStats:
         self.model.train()
+        self.comm_net.train()
+
         self._training_count += 1
         algo_config = self.config[constants.ALGO_CONFIG]
 
@@ -146,13 +154,14 @@ class IQLCommPolicy(Policy):
         # training data
         obs = samples[constants.OBS]
         actions = samples[constants.ACTION]
-        rewards = samples[constants.REWARD]
-        rewards = rewards.float()
+        rewards = samples[constants.REWARD].float()
         next_obs = samples[constants.NEXT_OBS]
         dones = samples[constants.DONE].long()
         next_sent_msgs = samples[constants.NEXT_SENT_MESSAGE]
         received_msgs = samples[constants.RECEIVED_MESSAGE]
         next_received_msgs = samples[constants.NEXT_RECEIVED_MESSAGE]
+        timestep = samples[constants.TIMESTEP]
+        exp_factor = samples[constants.EXPLORATION_FACTOR]
         seq_mask = (~samples[constants.SEQ_MASK]).long()
         if constants.NEXT_ACTION_MASK in samples:
             next_action_mask = samples[constants.NEXT_ACTION_MASK]
@@ -163,11 +172,18 @@ class IQLCommPolicy(Policy):
         if algo_config.reward_normalization:
             rewards = (rewards - rewards.mean()) / (rewards.std() + EPS)
 
-        # put all observations together for convenience
+        # construct model inputs
         B, T = obs.shape[:2]
         sent_msgs, _ = self.comm_net(obs, [])
-        input_x_t = torch.cat((obs, sent_msgs, received_msgs.view(B, T, -1)), dim=-1)
-        input_x_tp1 = torch.cat((next_obs, next_sent_msgs, next_received_msgs.view(B, T, -1)), dim=-1)
+        input_x_t = [obs, sent_msgs, received_msgs.view(B, T, -1)]
+        input_x_tp1 = [next_obs, next_sent_msgs, next_received_msgs.view(B, T, -1)]
+        # construct fingerprint
+        if self.algo_config.use_timestep_fingerprint:
+            fp = torch.cat((timestep, exp_factor), dim=-1).float()
+            input_x_t.append(fp)
+            input_x_tp1.append(fp)
+        input_x_t = torch.cat(input_x_t, dim=-1)
+        input_x_tp1 = torch.cat(input_x_tp1, dim=-1)
 
         # get q-values for all experiences
         mac_out = utils.unroll_mac(self.model, input_x_t)
