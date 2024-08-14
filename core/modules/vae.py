@@ -9,10 +9,9 @@ class VariationalAE(nn.Module):
     Implement a variational autoencoder for density estimation.
     """
 
-    def __init__(self, input_dim: int, hidden_layer_dims: List[int], latent_dim: int, action_lookup: bool):
+    def __init__(self, input_dim: int, hidden_layer_dims: List[int], latent_dim: int):
         super(VariationalAE, self).__init__()
         self.latent_dim = latent_dim
-        self.action_lookup = action_lookup
 
         # vae layers
         prev_dim = input_dim

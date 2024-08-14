@@ -52,13 +52,11 @@ class WBQLPolicy(Policy):
             input_dim=self.obs_size + 1,
             hidden_layer_dims=self.model_config.vae_hidden_layers,
             latent_dim=self.model_config.vae_latent_dim,
-            action_lookup=self.model_config.vae_use_action_lookup,
         ).to(self.device)
         self.target_vae = VariationalAE(
             input_dim=self.obs_size + 1,
             hidden_layer_dims=self.model_config.vae_hidden_layers,
             latent_dim=self.model_config.vae_latent_dim,
-            action_lookup=self.model_config.vae_use_action_lookup,
         ).to(self.device)
 
         # create optimizers

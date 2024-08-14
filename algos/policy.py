@@ -37,6 +37,7 @@ class Policy(abc.ABC):
         self.policy_id = policy_id  # only relevant in the multi-agent case
         self.global_timestep = 0
         self.fp_size = 2 if self.algo_config.use_timestep_fingerprint else 0
+        self.comm_enabled = self.algo_config.comm_size and self.algo_config.comm_size > 0
 
         # action space should either be discrete or box
         self.act_space = config[constants.ENV_CONFIG][constants.ENV_ACT_SPACE]
