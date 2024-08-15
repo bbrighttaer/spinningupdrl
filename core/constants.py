@@ -59,11 +59,6 @@ Number = typing.TypeVar("Number")  # int, float, long
 AgentID = str
 PolicyID = str
 
-
-# Replay buffer policies
-SHARED_BUFFER = "shared_replay_buffer"
-INDIVIDUAL_BUFFER = "individual_replay_buffer"
-
 # communication
 CONCATENATE_MSGS = "concatenate_received_msgs"
 PROJECT_MSGS = "project_shared_msgs"
