@@ -183,8 +183,8 @@ class BQLPolicy(Policy):
         )
 
         # Qi objective
-        q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions.unsqueeze(2))
-        qe_bar_q_values = torch.gather(aux_target_mac_out[:, :-1], dim=2, index=actions.unsqueeze(2))
+        q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions.unsqueeze(2)).squeeze(2)
+        qe_bar_q_values = torch.gather(aux_target_mac_out[:, :-1], dim=2, index=actions.unsqueeze(2)).squeeze(2)
         weights = torch.where(qe_bar_q_values > q_values, 1.0, algo_config.lamda)
         qi_loss, masked_td_error, seq_mask_sum = calc_mse_loss(
             q_values, qe_bar_q_values.detach(), seq_mask, weights

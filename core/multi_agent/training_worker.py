@@ -49,4 +49,4 @@ class MultiAgentIndependentTrainingWorker(TrainingWorker):
             )
 
             # Replay buffer callback (e.g. on-policy buffer can be cleared at this stage)
-            replay_buffer.on_learning_completed()
+            self.replay_buffer.on_learning_completed()

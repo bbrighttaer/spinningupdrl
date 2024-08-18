@@ -244,8 +244,8 @@ class WBQLPolicy(Policy):
         qe_loss, qe_masked_td_error, _ = calc_mse_loss(qe_q_values.squeeze(2), qe_targets.detach(), seq_mask)
 
         # Qi objective
-        q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions.unsqueeze(2))
-        qe_bar_q_values = torch.gather(aux_target_mac_out[:, :-1], dim=2, index=actions.unsqueeze(2))
+        q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions.unsqueeze(2)).squeeze(2)
+        qe_bar_q_values = torch.gather(aux_target_mac_out[:, :-1], dim=2, index=actions.unsqueeze(2)).squeeze(2)
         # weights = self._get_weights(obs, actions, qe_bar_q_values.detach(), q_values.detach())
         qi_loss, masked_td_error, seq_mask_sum = calc_mse_loss(q_values, qe_bar_q_values.detach(), seq_mask) #, weights)
 
