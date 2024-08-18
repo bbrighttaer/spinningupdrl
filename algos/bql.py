@@ -169,7 +169,7 @@ class BQLPolicy(Policy):
         aux_target_mac_out = utils.unroll_mac(self.aux_target_model, whole_obs)
 
         # Qe objective
-        qe_q_values = torch.gather(aux_mac_out[:, :-1], dim=2, index=actions)
+        qe_q_values = torch.gather(aux_mac_out[:, :-1], dim=2, index=actions.unsqueeze(2))
         qi_tp1_q_values = mac_out[:, 1:].clone()
         # if action mask is present avoid selecting unavailable actions
         if self.action_mask_size > 0 and next_action_mask is not None:
@@ -177,15 +177,18 @@ class BQLPolicy(Policy):
             qi_tp1_q_values[ignore_action_tp1] = -np.inf
         qi_tp1_q_values = torch.max(qi_tp1_q_values, dim=2)[0]
 
-        qi_tp1_q_values = qi_tp1_q_values.unsqueeze(dim=2)
         qe_targets = rewards + (1 - dones) * algo_config.gamma * qi_tp1_q_values
-        qe_loss, qe_masked_td_error, _ = calc_mse_loss(qe_q_values, qe_targets.detach(), seq_mask)
+        qe_loss, qe_masked_td_error, _ = calc_mse_loss(
+            qe_q_values.squeeze(2), qe_targets.detach(), seq_mask
+        )
 
         # Qi objective
-        q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions)
-        qe_bar_q_values = torch.gather(aux_target_mac_out[:, :-1], dim=2, index=actions)
+        q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions.unsqueeze(2))
+        qe_bar_q_values = torch.gather(aux_target_mac_out[:, :-1], dim=2, index=actions.unsqueeze(2))
         weights = torch.where(qe_bar_q_values > q_values, 1.0, algo_config.lamda)
-        qi_loss, masked_td_error, seq_mask_sum = calc_mse_loss(q_values, qe_bar_q_values.detach(), seq_mask, weights)
+        qi_loss, masked_td_error, seq_mask_sum = calc_mse_loss(
+            q_values, qe_bar_q_values.detach(), seq_mask, weights
+        )
 
         # aggregate the two objectives
         loss = qi_loss + qe_loss

@@ -14,20 +14,26 @@ class SampleBatch(dict):
     def __init__(self, *args, **kwargs):
         batch = kwargs.pop("batch", [])
         super().__init__(*args, **kwargs)
-        batch_ep = Episode()
-        for ep in batch:
-            batch_ep.add(**ep.data)
-        batch_ep = batch_ep.merge_time_steps()
-        self.update({k: v[0] for k, v in batch_ep.data.items()})
-        self._count = len(batch)
+        if batch:
+            batch_ep = Episode()
+            for ep in batch:
+                batch_ep.add(**ep.data)
+            batch_ep = batch_ep.merge_time_steps()
+            self.update({k: v[0] for k, v in batch_ep.data.items()})
         self._intercepted = {}
         self._interceptor = None
 
     def set_get_interceptor(self, interceptor: Callable[[np.ndarray], torch.Tensor]):
         self._interceptor = interceptor
 
+    def slice_multi_agent_batch(self, i):
+        return SampleBatch({
+            k: v[:, :, i] for k, v in self.items()
+        })
+
     def __len__(self):
-        return self._count
+        value = dict.__getitem__(self, list(self.keys())[0])
+        return len(value)
 
     def __getitem__(self, key):
         value = dict.__getitem__(self, key)

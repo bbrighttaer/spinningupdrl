@@ -15,7 +15,7 @@ from core.proto.multi_agent_policy_mapping_proto import MultiAgentPolicyMapping
 
 def MultiAgentIndependentPolicyCreator(
         config, summary_writer, logger
-) -> typing.Tuple[typing.Dict[str, Policy], typing.Dict[str, ReplayBuffer], typing.Callable[[AgentID], PolicyID]]:
+) -> typing.Tuple[typing.Dict[str, Policy], ReplayBuffer, typing.Callable[[AgentID], PolicyID]]:
     config = copy.deepcopy(config)
     env_config = config[constants.ENV_CONFIG]
 
@@ -34,20 +34,19 @@ def MultiAgentIndependentPolicyCreator(
 
     env_info = env.unwrapped.get_env_info()
     policy_mapping = {}
-    replay_buffer_mapping = {}
+    buffer_size = config[constants.ALGO_CONFIG].buffer_size
+    replay_buffer = ReplayBuffer(buffer_size, policy_id="default")
 
     n_agents = env_info[constants.ENV_NUM_AGENTS]
-    buffer_size = config[constants.ALGO_CONFIG].buffer_size
     for i in range(n_agents):
         policy_id = f"policy_{i}"
         env_config[constants.OBS] = copy.deepcopy(obs_space[f"agent_{i}"])
         env_config[constants.ENV_ACT_SPACE] = copy.deepcopy(env.action_space)
         env_config[constants.ENV_NUM_AGENTS] = n_agents
-        replay_buffer_mapping[policy_id] = ReplayBuffer(buffer_size, policy_id="default")
         policy_class = ALGO_REGISTRY[config[constants.ALGO_CONFIG].algo]
         policy_mapping[policy_id] = policy_class(config, summary_writer, logger, policy_id=policy_id)
 
-    return policy_mapping, replay_buffer_mapping, IndividualAgentPolicyMapping(n_agents)
+    return policy_mapping, replay_buffer, IndividualAgentPolicyMapping(n_agents)
 
 
 class IndividualAgentPolicyMapping(MultiAgentPolicyMapping):

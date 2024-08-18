@@ -140,7 +140,7 @@ class HIQLPolicy(Policy):
         target_mac_out = utils.unroll_mac(self.target_model, whole_obs)
 
         # main model q-values
-        q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions)
+        q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions.unsqueeze(2))
 
         # target model q-values
         target_mac_out_tp1 = target_mac_out[:, 1:]
@@ -149,14 +149,13 @@ class HIQLPolicy(Policy):
             ignore_action_tp1 = (next_action_mask == 0) & (seq_mask == 1)
             target_mac_out_tp1[ignore_action_tp1] = -np.inf
         target_q_values = torch.max(target_mac_out_tp1, dim=2)[0]
-        target_q_values = target_q_values.unsqueeze(dim=2)
 
         # compute targets
         targets = rewards + (1 - dones) * algo_config.gamma * target_q_values
         targets = targets.detach()
 
         # one step TD error
-        td_error = targets - q_values
+        td_error = targets - q_values.squeeze(2)
         weights = torch.where(td_error < 0., self.algo_config.beta, self.algo_config.alpha)
         masked_td_error = seq_mask * td_error
         loss = weights * masked_td_error ** 2

@@ -223,7 +223,7 @@ class WIQLCommPolicy(Policy):
         target_mac_out_tp1 = utils.unroll_mac(self.target_model, input_x_tp1)
 
         # main model q-values
-        q_values = torch.gather(mac_out, dim=2, index=actions)
+        q_values = torch.gather(mac_out, dim=2, index=actions.unsqueeze(2))
 
         # target model q-values
         # if action mask is present avoid selecting these actions
@@ -231,7 +231,6 @@ class WIQLCommPolicy(Policy):
             ignore_action_tp1 = (next_action_mask == 0) & (seq_mask == 1)
             target_mac_out_tp1[ignore_action_tp1] = -np.inf
         target_q_values = torch.max(target_mac_out_tp1, dim=2)[0]
-        target_q_values = target_q_values.unsqueeze(dim=2)
 
         # compute targets
         targets = rewards + (1 - dones) * algo_config.gamma * target_q_values
@@ -240,7 +239,7 @@ class WIQLCommPolicy(Policy):
         weights = tdw.target_distribution_weighting(self, targets)
 
         # one step TD error
-        td_error = targets - q_values
+        td_error = targets - q_values.unsqueeze(2)
         masked_td_error = seq_mask * td_error
         loss = masked_td_error ** 2
         loss *= weights

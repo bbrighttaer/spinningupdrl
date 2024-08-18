@@ -6,6 +6,9 @@ class SampleBatch(Protocol):
     Protocol for SampleBatch class
     """
 
+    def slice_multi_agent_batch(self, i):
+        ...
+
     def __len__(self):
         ...
 

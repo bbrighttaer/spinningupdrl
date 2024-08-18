@@ -37,13 +37,13 @@ class DefaultExecutionStrategy(RolloutWorkerExecutionStrategy):
             policy = self.policies[policy_id]
             agent_id = self.policy_mapping_fn(policy_id)
             action, hidden_state = policy.compute_action(
-                obs=obs[agent_id],
+                obs=obs[policy_id],
                 prev_action=prev_actions[policy_id],
                 prev_hidden_state=prev_hidden_states[policy_id],
                 explore=explore,
                 shared_messages=received_msgs_t[policy_id],
-                state=state[agent_id],
-                action_mask=action_mask[agent_id],
+                state=state[policy_id],
+                action_mask=action_mask[policy_id],
             )
             actions_dict[agent_id] = action
             hidden_states[policy_id] = hidden_state
@@ -58,10 +58,15 @@ class DefaultExecutionStrategy(RolloutWorkerExecutionStrategy):
         # send selected actions to environment
         env_next_obs, reward, done, truncated, info = env.step(actions_dict)
 
-        # set termination info for each agent
+        # set rewards and termination info for each agent
         dones = {}
+        rewards = {}
         for policy_id in self.policies.keys():
             agent_id = self.policy_mapping_fn(policy_id)
+            # reward mapping from agent id to policy id
+            rewards[policy_id] = reward[agent_id]
+
+            # termination info
             if "__all__" in done:
                 dones[policy_id] = done["__all__"]
             else:
@@ -83,7 +88,7 @@ class DefaultExecutionStrategy(RolloutWorkerExecutionStrategy):
             constants.OBS: obs,
             constants.STATE: state,
             constants.ACTION_MASK: action_mask,
-            constants.REWARD: reward,
+            constants.REWARD: rewards,
             constants.NEXT_OBS: next_obs,
             constants.NEXT_STATE: next_state,
             constants.NEXT_ACTION_MASK: self.worker.unpack_env_data(env_next_obs, constants.ACTION_MASK),
@@ -93,22 +98,23 @@ class DefaultExecutionStrategy(RolloutWorkerExecutionStrategy):
             constants.ACTION: {
                 self.policy_mapping_fn(agent, reverse=True): actions_dict[agent] for agent in actions_dict
             },
+            constants.PREV_ACTION: prev_actions,
             constants.SENT_MESSAGE: messages_t,
             constants.NEXT_SENT_MESSAGE: messages_tp1,
             constants.RECEIVED_MESSAGE: received_msgs_t,
             constants.NEXT_RECEIVED_MESSAGE: received_msgs_tp1,
             constants.TIMESTEP: timestep_hist,
-            constants.EXPLORATION_FACTOR: exploration_factor
+            constants.EXPLORATION_FACTOR: exploration_factor,
+            constants.SEQ_MASK: {policy_id: False for policy_id in self.policies}
         }
 
     def _get_agent_messages(self, obs, state, prev_messages, use_target=False):
         messages = {}
         for policy_id in self.policies:
             policy = self.policies[policy_id]
-            agent_id = self.policy_mapping_fn(policy_id)
             message = policy.get_message(
-                obs=obs[agent_id],
-                state=state[agent_id],
+                obs=obs[policy_id],
+                state=state[policy_id],
                 prev_msg=prev_messages[policy_id],
                 use_target=use_target
             )

@@ -13,12 +13,12 @@ from core.proto.rollout_worker_proto import RolloutWorker
 
 def RolloutWorkerCreator(
         policies: typing.Dict[constants.PolicyID, Policy],
-        replay_buffers: typing.Dict[constants.PolicyID, ReplayBuffer],
+        replay_buffer: ReplayBuffer,
         policy_mapping_fn: typing.Callable[[constants.PolicyID], constants.AgentID],
         config: dict,
         logger, callback=None) -> RolloutWorker:
     return SimpleMultiAgentRolloutWorker(
-        policies, replay_buffers, policy_mapping_fn, config, logger, callback,
+        policies, replay_buffer, policy_mapping_fn, config, logger, callback,
     )
 
 
@@ -26,12 +26,12 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
 
     def __init__(self,
                  policies: typing.Dict[constants.PolicyID, Policy],
-                 replay_buffers: typing.Dict[constants.PolicyID, ReplayBuffer],
+                 replay_buffer: ReplayBuffer,
                  policy_mapping_fn: typing.Callable[[constants.PolicyID], constants.AgentID],
                  config: dict,
                  logger, callback):
         self.policies = policies
-        self.replay_buffers = replay_buffers
+        self.replay_buffer = replay_buffer
         self.policy_mapping_fn = policy_mapping_fn
         self.config = config
         self.logger = logger
@@ -75,7 +75,7 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
                     agent_data = []
             else:
                 agent_data = None
-            data[agent_id] = agent_data
+            data[policy_id] = agent_data
         return data
 
     def generate_trajectory(self):
@@ -87,15 +87,35 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
         done = False
         episode_len = 0
         episode_reward = 0
+        episode = Episode()
         prev_act = collections.defaultdict(int)
         prev_hidden_states = {}
         prev_messages = {}
-        policies_episode = {}
         for policy_id in self.policies:
             policy = self.policies[policy_id]
             prev_hidden_states[policy_id] = policy.get_initial_hidden_state()
             prev_messages[policy_id] = policy.get_initial_message()
-            policies_episode[policy_id] = Episode()
+
+        # list of experience elements
+        experience_attributes = [
+            constants.OBS,
+            constants.STATE,
+            constants.ACTION_MASK,
+            constants.ACTION,
+            constants.REWARD,
+            constants.NEXT_OBS,
+            constants.NEXT_STATE,
+            constants.NEXT_ACTION_MASK,
+            constants.DONE,
+            constants.PREV_ACTION,
+            constants.SENT_MESSAGE,
+            constants.NEXT_SENT_MESSAGE,
+            constants.RECEIVED_MESSAGE,
+            constants.NEXT_RECEIVED_MESSAGE,
+            constants.TIMESTEP,
+            constants.EXPLORATION_FACTOR,
+            constants.SEQ_MASK,
+        ]
 
         # Run for an episode
         while not done and episode_len < self.config[constants.RUNNING_CONFIG].max_timesteps_per_episode:
@@ -111,29 +131,12 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
             )
 
             # add timestep record to episode/trajectory of each agent/policy
-            for policy_id in self.policies:
-                policy_episode = policies_episode[policy_id]
-                agent_id = self.policy_mapping_fn(policy_id)
-                experience = {
-                    constants.OBS: results[constants.OBS][agent_id],
-                    constants.STATE: results[constants.STATE][agent_id],
-                    constants.ACTION_MASK: results[constants.ACTION_MASK][agent_id],
-                    constants.ACTION: results[constants.ACTION][policy_id],
-                    constants.REWARD: results[constants.REWARD][agent_id],
-                    constants.NEXT_OBS: results[constants.NEXT_OBS][agent_id],
-                    constants.NEXT_STATE: results[constants.NEXT_STATE][agent_id],
-                    constants.NEXT_ACTION_MASK: results[constants.NEXT_ACTION_MASK][agent_id],
-                    constants.DONE: results[constants.DONE][policy_id],
-                    constants.PREV_ACTION: prev_act[policy_id],
-                    constants.SENT_MESSAGE: results[constants.SENT_MESSAGE][policy_id],
-                    constants.NEXT_SENT_MESSAGE: results[constants.NEXT_SENT_MESSAGE][policy_id],
-                    constants.RECEIVED_MESSAGE: results[constants.RECEIVED_MESSAGE][policy_id],
-                    constants.NEXT_RECEIVED_MESSAGE: results[constants.NEXT_RECEIVED_MESSAGE][policy_id],
-                    constants.TIMESTEP: results[constants.TIMESTEP][policy_id],
-                    constants.EXPLORATION_FACTOR: results[constants.EXPLORATION_FACTOR][policy_id],
-                    constants.SEQ_MASK: False,
-                }
-                policy_episode.add(**experience)
+            experience = {
+               exp_attr: [
+                   results[exp_attr][policy_id] for policy_id in self.policies
+               ] for exp_attr in experience_attributes
+            }
+            episode.add(**experience)
 
             # timestep props update
             obs = results[constants.NEXT_OBS]
@@ -152,10 +155,8 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
             rewards_list = list(results[constants.REWARD].values())
             episode_reward += sum(rewards_list)
 
-        # add episodes the buffer of policies
-        for policy_id in self.replay_buffers:
-            replay_buffer = self.replay_buffers[policy_id]
-            replay_buffer.add(policies_episode[policy_id])
+        # add episode the buffer (co-incident on the policy/agent axis)
+        self.replay_buffer.add(episode)
 
         # record metrics
         self.callback.on_episode_end(

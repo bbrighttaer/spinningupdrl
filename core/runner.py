@@ -108,18 +108,18 @@ class Runner:
 
         elif self.cmd_args.mode == constants.MULTI_AGENT:
             # create policies using PolicyCreator
-            policies, replay_buffers, policy_mapping_fn = multi_agent.MultiAgentIndependentPolicyCreator(
+            policies, replay_buffer, policy_mapping_fn = multi_agent.MultiAgentIndependentPolicyCreator(
                 config, summary_writer, logger
             )
 
             # create rollout worker
             rollout_worker = multi_agent.RolloutWorkerCreator(
-                policies, replay_buffers, policy_mapping_fn, config, logger, callback
+                policies, replay_buffer, policy_mapping_fn, config, logger, callback
             )
 
             # create training worker
             training_worker = multi_agent.MultiAgentIndependentTrainingWorker(
-                policies, replay_buffers, policy_mapping_fn, config, logger, callback
+                policies, replay_buffer, policy_mapping_fn, config, logger, callback
             )
 
             # start execution

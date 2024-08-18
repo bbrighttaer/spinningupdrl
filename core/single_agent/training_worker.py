@@ -12,7 +12,7 @@ class SingleAgentTrainingWorker(TrainingWorker):
                  config: dict,
                  logger, callback):
         self.policy = policy
-        self.replay = replay_buffer
+        self.replay_buffer = replay_buffer
         self.config = config
         self.logger = logger
         self.callback = callback
@@ -21,11 +21,11 @@ class SingleAgentTrainingWorker(TrainingWorker):
         algo_config = self.config[constants.ALGO_CONFIG]
 
         # Train after `num_steps_to_training` timesteps
-        if len(self.replay) < algo_config.replay_start_size:
+        if len(self.replay_buffer) < algo_config.replay_start_size:
             return
 
         # Sample a batch from the buffer
-        samples = self.replay.sample(algo_config.training_batch_size)
+        samples = self.replay_buffer.sample(algo_config.training_batch_size)
 
         # Train using samples
         learning_stats = self.policy.learn(samples)
@@ -39,4 +39,4 @@ class SingleAgentTrainingWorker(TrainingWorker):
         )
 
         # Replay buffer callback (e.g. on-policy buffer can be cleared at this stage)
-        self.replay.on_learning_completed()
+        self.replay_buffer.on_learning_completed()
