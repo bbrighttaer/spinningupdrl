@@ -8,12 +8,11 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from algos import Policy
 from algos.policy import LearningStats
-from core import constants, utils, EPS, metrics, kde
+from core import constants, utils, EPS, metrics
 from core.buffer import sample_batch
 from core.exploration import EpsilonGreedy
 from core.modules.mlp import SimpleFCNet
-from core.modules.rnn import SimpleRNN
-from core.modules.vae import VariationalAE
+from core.modules.rnn import SimpleRNN, WeightNetRNN
 
 
 def calc_mse_loss(q_values, targets, seq_mask, weights=None):
@@ -47,28 +46,20 @@ class WBQLPolicy(Policy):
         else:
             raise RuntimeError("Core arch should be either gru or mlp")
 
-        # Autoencoder
-        self.vae = VariationalAE(
-            input_dim=self.obs_size + 1,
-            hidden_layer_dims=self.model_config.vae_hidden_layers,
-            latent_dim=self.model_config.vae_latent_dim,
-        ).to(self.device)
-        self.target_vae = VariationalAE(
-            input_dim=self.obs_size + 1,
-            hidden_layer_dims=self.model_config.vae_hidden_layers,
-            latent_dim=self.model_config.vae_latent_dim,
-        ).to(self.device)
+        # Weight model
+        self.model_config.fp_size = 3
+        self.weight_model = WeightNetRNN(self.model_config).to(self.device)
 
         # create optimizers
         self.params = list(self.model.parameters()) + list(self.aux_model.parameters())
+        # self.params += list(self.weight_model.parameters())
         if self.algo_config.optimizer == "rmsprop":
             from torch.optim import RMSprop
             self.optimizer = RMSprop(params=self.params, lr=self.algo_config.learning_rate)
-            self.vae_optimizer = RMSprop(params=self.vae.parameters(), lr=self.algo_config.learning_rate)
+            self.wts_optimizer = RMSprop(params=self.weight_model.parameters(), lr=self.algo_config.learning_rate)
         elif self.algo_config.optimizer == "adam":
             from torch.optim import Adam
             self.optimizer = Adam(params=self.params, lr=self.algo_config.learning_rate)
-            self.vae_optimizer = Adam(params=self.vae.parameters(), lr=self.algo_config.learning_rate)
         else:
             raise RuntimeError(f"Unsupported optimizer: {self.algo_config.optimizer}")
 
@@ -89,15 +80,13 @@ class WBQLPolicy(Policy):
 
     def update_target(self):
         utils.soft_update(self.aux_target_model, self.aux_model, self.config[constants.ALGO_CONFIG].tau)
-        utils.soft_update(self.target_vae, self.vae, self.config[constants.ALGO_CONFIG].tau)
 
     def get_weights(self):
         return {
             "model": utils.tensor_state_dict_to_numpy_state_dict(self.model.state_dict()),
             "aux_model": utils.tensor_state_dict_to_numpy_state_dict(self.aux_model.state_dict()),
             "aux_target_model": utils.tensor_state_dict_to_numpy_state_dict(self.aux_target_model.state_dict()),
-            "vae": utils.tensor_state_dict_to_numpy_state_dict(self.vae.state_dict()),
-            "target_vae": utils.tensor_state_dict_to_numpy_state_dict(self.target_vae.state_dict())
+            "weight_model": utils.tensor_state_dict_to_numpy_state_dict(self.weight_model.state_dict()),
         }
 
     def set_weights(self, weights):
@@ -113,13 +102,9 @@ class WBQLPolicy(Policy):
             self.aux_target_model.load_state_dict(
                 utils.numpy_state_dict_to_tensor_state_dict(weights["aux_target_model"], self.device)
             )
-        if "vae" in weights:
-            self.vae.load_state_dict(
-                utils.numpy_state_dict_to_tensor_state_dict(weights["vae"], self.device)
-            )
-        if "target_vae" in weights:
-            self.target_vae.load_state_dict(
-                utils.numpy_state_dict_to_tensor_state_dict(weights["target_vae"], self.device)
+        if "weight_model" in weights:
+            self.weight_model.load_state_dict(
+                utils.numpy_state_dict_to_tensor_state_dict(weights["weight_model"], self.device)
             )
 
     @torch.no_grad()
@@ -155,40 +140,6 @@ class WBQLPolicy(Policy):
 
         return action, [utils.tensor_to_numpy(h) for h in hidden_states]
 
-    def _get_weights(self, obs, actions, target_q_values, q_values):
-        B, T = obs.shape[:2]
-        target_q_values = target_q_values.view(B * T, -1)
-        q_values = q_values.view(B * T, -1)
-        actions = actions.view(B * T, -1)
-        x = torch.cat([obs.view(B * T, -1), actions], dim=-1)
-
-        # update vae parameters
-        self.fit_vae(x)
-
-        with torch.no_grad():
-            self.vae.eval()
-
-            # select samples
-            subset_size = self.algo_config.kde_subset_size or 100
-
-            # compute Q(x)
-            # q densities
-            outputs, mu, logvar = self.vae.encode(x)
-            q_densities = kde.kde_density(outputs, mu, logvar, subset_size)
-            q_densities = utils.apply_scaling(q_densities)
-
-            # compute P(x)
-            targets_scaled = utils.shift_and_scale(target_q_values)
-            target_outputs, target_mu, target_logvar = self.target_vae.encode(x)
-            p_densities = targets_scaled / kde.kde_density(target_outputs, target_mu, target_logvar, subset_size)
-            p_densities /= (p_densities.max() + EPS)
-
-            # compute weights
-            weights = p_densities / q_densities
-            weights = utils.apply_scaling(weights)
-            weights = weights.view(B, T, 1)
-            return weights
-
     def learn(self, samples: sample_batch.SampleBatch) -> LearningStats:
         self.model.train()
         self.aux_model.train()
@@ -206,6 +157,8 @@ class WBQLPolicy(Policy):
         rewards = rewards.float()
         next_obs = samples[constants.NEXT_OBS]
         dones = samples[constants.DONE].long()
+        timesteps = samples[constants.TIMESTEP]
+        exp_factor = samples[constants.EXPLORATION_FACTOR]
         seq_mask = (~samples[constants.SEQ_MASK]).long()
         if constants.NEXT_ACTION_MASK in samples:
             next_action_mask = samples[constants.NEXT_ACTION_MASK]
@@ -246,11 +199,30 @@ class WBQLPolicy(Policy):
         # Qi objective
         q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions.unsqueeze(2)).squeeze(2)
         qe_bar_q_values = torch.gather(aux_target_mac_out[:, :-1], dim=2, index=actions.unsqueeze(2)).squeeze(2)
-        # weights = self._get_weights(obs, actions, qe_bar_q_values.detach(), q_values.detach())
-        qi_loss, masked_td_error, seq_mask_sum = calc_mse_loss(q_values, qe_bar_q_values.detach(), seq_mask) #, weights)
+        # get weights
+        td_error = (qe_bar_q_values - q_values).detach()
+        # weights of samples
+        B, T = obs.shape[:2]
+        td_error_detached = td_error.detach()
+        wts_x = torch.cat([
+            td_error.view(B, T, -1),
+            timesteps.view(B, T, -1),
+            exp_factor.view(B, T, -1),
+            # obs.view(B, T, -1),
+            # next_obs.view(B, T, -1),
+            # rewards.view(B, T, -1),
+            # actions.view(B, T, -1),
+        ], dim=-1).float()
+        weights = utils.unroll_mac(self.weight_model, wts_x).squeeze(2)
+        wts_targets = torch.where(
+            td_error_detached < 0., self.algo_config.beta, self.algo_config.alpha
+        )
+        wts_loss = utils.huber_loss_with_sigma(weights, wts_targets, sigma=0.2)
+        qi_loss, masked_td_error, seq_mask_sum = calc_mse_loss(q_values, qe_bar_q_values.detach(), seq_mask, weights.detach())
 
         # aggregate the two objectives
-        loss = qi_loss + qe_loss
+        wts_loss = (wts_loss * seq_mask).sum() / seq_mask_sum
+        loss = qi_loss + qe_loss + wts_loss
 
         # optimization
         self.optimizer.zero_grad()

@@ -42,3 +42,34 @@ class SimpleFCNet(TorchModel):
             input_obs = self.embedding(input_obs.long()).view(input_obs.shape[0], -1)
         x = self.model(input_obs)
         return x, []
+
+
+class WeightNetMLP(TorchModel):
+
+    def __init__(self, config: DotDic):
+        super().__init__(config)
+
+        layers = []
+        activation = utils.get_activation_function(self.model_config.activation)
+        input_dim = self.fp_dim
+
+        # create hidden layers
+        for dim in self.model_config.hidden_layers:
+            layers.extend([
+                nn.Linear(input_dim, dim),
+                activation(),
+            ])
+            input_dim = dim
+
+        # output layer
+        layers.extend([
+            nn.Linear(input_dim, 1),
+            nn.Sigmoid()
+        ])
+
+        # create model
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, input_x, hidden_state, **kwargs):
+        x = self.model(input_x)
+        return x, []

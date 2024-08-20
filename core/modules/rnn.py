@@ -81,3 +81,52 @@ class SimpleRNN(TorchModel):
         x = self.output(z_out)
 
         return x, h
+
+
+class WeightNetRNN(SimpleRNN):
+
+    def __init__(self, config: DotDic):
+        super().__init__(config)
+        activation = utils.get_activation_function(self.model_config["activation"])
+        action_embedding_dim = 5
+        input_dim = self.fp_dim #+ self.obs_dim * 2 + action_embedding_dim
+        self.action_lookup = nn.Embedding(self.action_dim, action_embedding_dim)
+
+        # encoder
+        enc_layers = []
+        for hdim in self.model_config.encoder_layers[:-1]:
+            enc_layers.extend([
+                nn.Linear(input_dim, hdim),
+                activation()
+            ])
+            input_dim = hdim
+        enc_out_dim = self.model_config.encoder_layers[-1]
+        enc_layers.extend([
+            nn.Linear(input_dim, enc_out_dim),
+            nn.BatchNorm1d(enc_out_dim),
+            activation()
+        ])
+        self.encoder = nn.Sequential(*enc_layers)
+
+        # recurrent layer
+        self.rnn = nn.GRU(
+            input_size=enc_out_dim,
+            hidden_size=self.model_config.hidden_state_dim,
+            num_layers=1,
+            batch_first=True,
+        )
+
+        # output layers
+        self.output = nn.Sequential(
+            nn.BatchNorm1d(self.model_config.hidden_state_dim),
+            activation(),
+            nn.Linear(self.model_config.hidden_state_dim, 1),
+            nn.Sigmoid()
+        )
+
+    # def forward(self, input_obs, hidden_state, **kwargs):
+    #     # assumes action dim is the last
+    #     actions = input_obs[:, -1]
+    #     actions_emb = self.action_lookup(actions.long())
+    #     input_obs = torch.cat([input_obs[:, :-1], actions_emb], dim=-1)
+    #     return super().forward(input_obs, hidden_state, **kwargs)

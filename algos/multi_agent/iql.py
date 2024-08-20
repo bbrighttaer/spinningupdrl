@@ -12,9 +12,9 @@ from core.modules.mlp import SimpleFCNet
 from core.modules.rnn import SimpleRNN
 
 
-class HIQLPolicy(Policy):
+class IQLPolicy(Policy):
     """
-    Hysteretic IQL
+    Independent DQN Policy
     """
 
     def __init__(self, config, summary_writer, logger, policy_id=None):
@@ -140,7 +140,7 @@ class HIQLPolicy(Policy):
         target_mac_out = utils.unroll_mac(self.target_model, whole_obs)
 
         # main model q-values
-        q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions.unsqueeze(2))
+        q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions.unsqueeze(2)).squeeze(2)
 
         # target model q-values
         target_mac_out_tp1 = target_mac_out[:, 1:]
@@ -155,10 +155,9 @@ class HIQLPolicy(Policy):
         targets = targets.detach()
 
         # one step TD error
-        td_error = targets - q_values.squeeze(2)
-        weights = torch.where(td_error < 0., self.algo_config.beta, self.algo_config.alpha)
+        td_error = targets - q_values
         masked_td_error = seq_mask * td_error
-        loss = weights * masked_td_error ** 2
+        loss = masked_td_error ** 2
         seq_mask_sum = seq_mask.sum()
         loss = loss.sum() / (seq_mask_sum + EPS)
 

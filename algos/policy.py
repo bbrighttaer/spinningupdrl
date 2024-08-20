@@ -72,7 +72,7 @@ class Policy(abc.ABC):
         self.model_config["n_actions"] = self.n_actions
         self.model_config["num_discrete_obs"] = self.num_discrete_obs
         self.model_config["comm_size"] = self.algo_config.comm_size
-        self.model_config["n_agents"] = config[constants.ENV_CONFIG][constants.ENV_NUM_AGENTS]
+        self.model_config["n_agents"] = config[constants.ENV_CONFIG].get(constants.ENV_NUM_AGENTS, 1)
         self.model_config["discrete_comm_space_size"] = self.algo_config.discrete_comm_space_size
         self.model_config["msg_aggregation_type"] = self.algo_config.msg_aggregation_type
 

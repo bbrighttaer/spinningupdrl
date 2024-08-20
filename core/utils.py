@@ -10,6 +10,7 @@ import gym
 import joblib
 import numpy as np
 import torch.nn
+import torch.nn.functional as F
 
 
 class DotDic(dict):
@@ -235,3 +236,10 @@ def apply_scaling(vector):
     # Normalise to [0, 1]
     vector /= (vector.max() + 1e-7)
     return vector
+
+
+def huber_loss_with_sigma(y_pred, y_true, sigma=0.5):
+    error = torch.abs(y_pred - y_true)
+    # loss = torch.where(error <= sigma, torch.tensor(0.0), 0.5 * (error - sigma)**2)
+    loss = torch.where(error <= sigma, torch.tensor(0.0), F.huber_loss(y_pred, y_true, reduction='none'))
+    return loss
