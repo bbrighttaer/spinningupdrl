@@ -149,6 +149,7 @@ class BQLPolicy(Policy):
             next_action_mask = samples[constants.NEXT_ACTION_MASK]
         else:
             next_action_mask = None
+        B, T = obs.shape[:2]
 
         if self.algo_config.show_reward_dist:
             stats = Counter(rewards.view(-1,).numpy())
@@ -173,7 +174,7 @@ class BQLPolicy(Policy):
         qi_tp1_q_values = mac_out[:, 1:].clone()
         # if action mask is present avoid selecting unavailable actions
         if self.action_mask_size > 0 and next_action_mask is not None:
-            ignore_action_tp1 = (next_action_mask == 0) & (seq_mask == 1)
+            ignore_action_tp1 = (next_action_mask.view(B, T, -1) == 0) & (seq_mask.view(B, T, -1) == 1)
             qi_tp1_q_values[ignore_action_tp1] = -np.inf
         qi_tp1_q_values = torch.max(qi_tp1_q_values, dim=2)[0]
 

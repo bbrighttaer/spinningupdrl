@@ -167,6 +167,7 @@ class IQLCommPolicy(Policy):
             next_action_mask = samples[constants.NEXT_ACTION_MASK]
         else:
             next_action_mask = None
+        B, T = obs.shape[:2]
 
         # reward normalization
         if algo_config.reward_normalization:
@@ -195,7 +196,7 @@ class IQLCommPolicy(Policy):
         # target model q-values
         # if action mask is present avoid selecting these actions
         if self.action_mask_size > 0 and next_action_mask is not None:
-            ignore_action_tp1 = (next_action_mask == 0) & (seq_mask == 1)
+            ignore_action_tp1 = (next_action_mask.view(B, T, -1) == 0) & (seq_mask.view(B, T, -1) == 1)
             target_mac_out_tp1[ignore_action_tp1] = -np.inf
         target_q_values = torch.max(target_mac_out_tp1, dim=2)[0]
 
