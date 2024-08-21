@@ -1,7 +1,7 @@
 
 RUNNING_CONFIG = {
-    "total_timesteps": 100000,
-    "logging_steps": 10000,
+    "total_timesteps": 1000000,
+    "logging_steps": 1000,
     "checkpoint_freq": 10000,
     "episode_reward_mean_goal": 1000,
     "max_timesteps_per_episode": 1000,
@@ -9,7 +9,7 @@ RUNNING_CONFIG = {
     "evaluation_num_episodes": 20,
 }
 ALGO_CONFIG = {
-    "buffer_size": 5000,
+    "buffer_size": 1000,
     "epsilon": 1.0,
     "final_epsilon": 1e-8,
     "epsilon_timesteps": 50000,
@@ -20,11 +20,11 @@ ALGO_CONFIG = {
     "optimizer": "rmsprop",
     "learning_rate": 0.0005,
     "grad_clip": 10,
-    "tau": 0.5,
+    "tau": 0.6,
     "reward_normalization": False,
 }
 MODEL_CONFIG = {
-    "core_arch": "rnn",
+    "core_arch": "mlp",
     "encoder_layers": [64],
     "hidden_state_dim": 64,
     "hidden_layers": [64, 64],

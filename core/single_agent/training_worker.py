@@ -25,10 +25,11 @@ class SingleAgentTrainingWorker(TrainingWorker):
             return
 
         # Sample a batch from the buffer
-        samples = self.replay_buffer.sample(algo_config.training_batch_size)
+        samples = self.replay_buffer.sample(algo_config.training_batch_size, timestep)
 
         # Train using samples
         learning_stats = self.policy.learn(samples)
+        td_error = learning_stats.pop(constants.TD_ERRORS)
 
         # update metrics
         self.callback.on_learn_on_batch_end(
@@ -38,5 +39,10 @@ class SingleAgentTrainingWorker(TrainingWorker):
             learning_stats=learning_stats,
         )
 
+        kwargs = {
+            constants.TD_ERRORS: td_error,
+            "sample_batch": samples,
+        }
+
         # Replay buffer callback (e.g. on-policy buffer can be cleared at this stage)
-        self.replay_buffer.on_learning_completed()
+        self.replay_buffer.on_learning_completed(**kwargs)

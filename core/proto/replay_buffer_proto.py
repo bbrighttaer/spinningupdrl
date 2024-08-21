@@ -12,10 +12,10 @@ class ReplayBuffer(Protocol):
     def add(self, episode: Episode):
         ...
 
-    def on_learning_completed(self):
+    def on_learning_completed(self, *args, **kwargs):
         ...
 
-    def sample(self, batch_size: int) -> SampleBatch:
+    def sample(self, batch_size: int, timestep: int) -> SampleBatch:
         ...
 
     def __len__(self):

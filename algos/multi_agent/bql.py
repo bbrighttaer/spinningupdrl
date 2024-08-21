@@ -213,6 +213,7 @@ class BQLPolicy(Policy):
             metrics.LearningMetrics.TD_ERROR_ABS: masked_td_error.abs().sum().item() / mask_elems,
             metrics.LearningMetrics.Q_TAKEN_MEAN: (q_values * seq_mask).sum().item() / mask_elems,
             metrics.LearningMetrics.TARGET_MEAN: (qe_bar_q_values * seq_mask).sum().item() / mask_elems,
+            constants.TD_ERRORS: utils.tensor_to_numpy(qe_masked_td_error)
         }
 
 

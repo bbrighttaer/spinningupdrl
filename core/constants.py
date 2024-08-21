@@ -32,6 +32,10 @@ NEXT_SENT_MESSAGE = "next_sent_msg"
 HIDDEN_STATE = "hidden_state"
 INFO = "info"
 EXPLORATION_FACTOR = "exploration_factor"
+TD_ERRORS = "td_errors"
+WEIGHTS = "weights"
+BATCH_INDEXES = "batch_indexes"
+SEQ_LENS = "seq_lens"
 
 # Experiment modes
 SINGLE_AGENT = "sa"

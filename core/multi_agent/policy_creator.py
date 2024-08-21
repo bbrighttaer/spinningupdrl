@@ -6,7 +6,8 @@ import gymnasium as gym
 
 from algos import ALGO_REGISTRY, Policy
 from core import constants, utils
-from core.buffer.replay_buffer import ReplayBuffer
+from core.proto.replay_buffer_proto import ReplayBuffer as ReplayBufferProto
+from core.buffer.replay_buffer import ReplayBuffer, PrioritizedExperienceReplayBuffer
 from core.constants import AgentID, PolicyID
 from core.envs.base_env import MultiAgentEnv
 from core.envs.ma_gym_wrapper import MAGymEnvWrapper
@@ -15,7 +16,7 @@ from core.proto.multi_agent_policy_mapping_proto import MultiAgentPolicyMapping
 
 def MultiAgentIndependentPolicyCreator(
         config, summary_writer, logger
-) -> typing.Tuple[typing.Dict[str, Policy], ReplayBuffer, typing.Callable[[AgentID], PolicyID]]:
+) -> typing.Tuple[typing.Dict[str, Policy], ReplayBufferProto, typing.Callable[[AgentID], PolicyID]]:
     config = copy.deepcopy(config)
     env_config = config[constants.ENV_CONFIG]
 
@@ -35,7 +36,7 @@ def MultiAgentIndependentPolicyCreator(
     env_info = env.unwrapped.get_env_info()
     policy_mapping = {}
     buffer_size = config[constants.ALGO_CONFIG].buffer_size
-    replay_buffer = ReplayBuffer(buffer_size, policy_id="default")
+    replay_buffer = PrioritizedExperienceReplayBuffer(buffer_size, policy_id="default", alpha=0.6, beta=0.4)
 
     n_agents = env_info[constants.ENV_NUM_AGENTS]
     for i in range(n_agents):

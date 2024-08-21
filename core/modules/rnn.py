@@ -34,7 +34,7 @@ class SimpleRNN(TorchModel):
         enc_out_dim = self.model_config.encoder_layers[-1]
         enc_layers.extend([
             nn.Linear(input_dim, enc_out_dim),
-            nn.BatchNorm1d(enc_out_dim),
+            # nn.BatchNorm1d(enc_out_dim),
             activation()
         ])
         self.encoder = nn.Sequential(*enc_layers)
@@ -50,7 +50,7 @@ class SimpleRNN(TorchModel):
 
         # output layers
         self.output = nn.Sequential(
-            nn.BatchNorm1d(self.model_config.hidden_state_dim),
+            # nn.BatchNorm1d(self.model_config.hidden_state_dim),
             activation(),
             nn.Linear(self.model_config.hidden_state_dim, self.action_dim)
         )
