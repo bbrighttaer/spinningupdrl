@@ -1,8 +1,9 @@
+from core import constants
 
 RUNNING_CONFIG = {
-    "total_timesteps": 1000000,
-    "logging_steps": 1000,
-    "checkpoint_freq": 1000,
+    "total_timesteps": 2000000,
+    "logging_steps": 10000,
+    "checkpoint_freq": 10000,
     "episode_reward_mean_goal": 1000,
     "max_timesteps_per_episode": 1000,
     "evaluation_interval": 1000,
@@ -16,7 +17,7 @@ ALGO_CONFIG = {
     "training_batch_size": 32,
     "replay_start_size": 100,
     "gamma": 0.99,
-    "target_update_freq": 100,
+    "target_update_freq": 200,
     "optimizer": "rmsprop",
     "learning_rate": 0.0005,
     "grad_clip": 10,
@@ -36,5 +37,6 @@ MODEL_CONFIG = {
     "dropout_rate": 0.,
 }
 ENV_CONFIG = {
-    "id": "Switch2-v0"
+    "id": "SMAC-v0",
+    "map_name": "3s_vs_5z"
 }

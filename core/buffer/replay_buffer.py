@@ -97,7 +97,7 @@ class PrioritizedExperienceReplayBuffer(ReplayBufferProto):
             final_beta: float = 1.0,
             beta_annealing_timesteps: float = 1000000,
             policy_id=None,
-            stochastic_eviction=True,
+            stochastic_eviction=False,
     ):
         self.capacity = capacity
         self._alpha = alpha

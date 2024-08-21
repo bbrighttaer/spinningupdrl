@@ -36,7 +36,13 @@ def MultiAgentIndependentPolicyCreator(
     env_info = env.unwrapped.get_env_info()
     policy_mapping = {}
     buffer_size = config[constants.ALGO_CONFIG].buffer_size
-    replay_buffer = PrioritizedExperienceReplayBuffer(buffer_size, policy_id="default", alpha=0.6, beta=0.4)
+    replay_buffer = ReplayBuffer(buffer_size, policy_id="default")
+    # replay_buffer = PrioritizedExperienceReplayBuffer(
+    #     buffer_size,
+    #     policy_id="default",
+    #     stochastic_eviction=True,
+    #     beta_annealing_timesteps=config[constants.RUNNING_CONFIG].total_timesteps
+    # )
 
     n_agents = env_info[constants.ENV_NUM_AGENTS]
     for i in range(n_agents):

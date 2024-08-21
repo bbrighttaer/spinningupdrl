@@ -51,7 +51,7 @@ class SimpleRNN(TorchModel):
         # output layers
         self.output = nn.Sequential(
             # nn.BatchNorm1d(self.model_config.hidden_state_dim),
-            activation(),
+            # activation(),
             nn.Linear(self.model_config.hidden_state_dim, self.action_dim)
         )
 

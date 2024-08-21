@@ -22,9 +22,14 @@ ALGO_CONFIG = {
     "learning_rate": 0.0005,
     "grad_clip": 10,
     "tau": 0.5,
-    "lamda": 0.1,
-    "alpha": 0.9,
-    "beta": 0.4,
+    "lamda": 0.6,
+    "prioritized_replay_alpha": 0.6,
+    "prioritized_replay_beta": 0.4,
+    "tdw_schedule": [
+        [0, 1.0],
+        [50000, 1.0],
+        [60000, 0.0],
+    ],
     "reward_normalization": False,
     "comm_size": 0,  # size or dimension of a message (if communication is enabled)
     "discrete_comm_space_size": 5,  # the size of the message space when using discrete communication

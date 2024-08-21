@@ -122,6 +122,7 @@ class IQLPolicy(Policy):
         rewards = rewards.float()
         next_obs = samples[constants.NEXT_OBS]
         dones = samples[constants.DONE].long()
+        weights = samples[constants.WEIGHTS]
         seq_mask = (~samples[constants.SEQ_MASK]).long()
         if constants.NEXT_ACTION_MASK in samples:
             next_action_mask = samples[constants.NEXT_ACTION_MASK]
@@ -157,7 +158,7 @@ class IQLPolicy(Policy):
         # one step TD error
         td_error = targets - q_values
         masked_td_error = seq_mask * td_error
-        loss = masked_td_error ** 2
+        loss = weights * masked_td_error ** 2
         seq_mask_sum = seq_mask.sum()
         loss = loss.sum() / (seq_mask_sum + EPS)
 
@@ -181,6 +182,7 @@ class IQLPolicy(Policy):
             metrics.LearningMetrics.TD_ERROR_ABS: masked_td_error.abs().sum().item() / mask_elems,
             metrics.LearningMetrics.Q_TAKEN_MEAN: (q_values * seq_mask).sum().item() / mask_elems,
             metrics.LearningMetrics.TARGET_MEAN: (targets * seq_mask).sum().item() / mask_elems,
+            constants.TD_ERRORS: utils.tensor_to_numpy(td_error)
         }
 
 

@@ -8,11 +8,12 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from algos import Policy
 from algos.policy import LearningStats
-from core import constants, utils, EPS, metrics
+from core import constants, utils, EPS, metrics, tdw
 from core.buffer import sample_batch
 from core.exploration import EpsilonGreedy
 from core.modules.mlp import SimpleFCNet
 from core.modules.rnn import SimpleRNN, WeightNetRNN
+from core.schedules.piecewise_schedule import PiecewiseSchedule
 
 
 def calc_mse_loss(q_values, targets, seq_mask, weights=None):
@@ -68,6 +69,12 @@ class WBQLPolicy(Policy):
             initial_epsilon=self.algo_config.epsilon,
             final_epsilon=self.algo_config.final_epsilon,
             epsilon_timesteps=self.algo_config.epsilon_timesteps,
+        )
+
+        tdw_schedule = self.algo_config.tdw_schedule
+        self.tdw_schedule = PiecewiseSchedule(
+            endpoints=tdw_schedule,
+            outside_value=tdw_schedule[-1][-1]
         )
 
         # trigger initial network sync
@@ -157,13 +164,13 @@ class WBQLPolicy(Policy):
         rewards = rewards.float()
         next_obs = samples[constants.NEXT_OBS]
         dones = samples[constants.DONE].long()
-        timesteps = samples[constants.TIMESTEP]
-        exp_factor = samples[constants.EXPLORATION_FACTOR]
+        weights = samples[constants.WEIGHTS]
         seq_mask = (~samples[constants.SEQ_MASK]).long()
         if constants.NEXT_ACTION_MASK in samples:
             next_action_mask = samples[constants.NEXT_ACTION_MASK]
         else:
             next_action_mask = None
+
         B, T = obs.shape[:2]
 
         if self.algo_config.show_reward_dist:
@@ -194,35 +201,23 @@ class WBQLPolicy(Policy):
         qi_tp1_q_values = torch.max(qi_tp1_q_values, dim=2)[0]
 
         qe_targets = rewards + (1 - dones) * algo_config.gamma * qi_tp1_q_values
-        qe_loss, qe_masked_td_error, _ = calc_mse_loss(qe_q_values.squeeze(2), qe_targets.detach(), seq_mask)
+        tdw_weights = tdw.target_distribution_weighting(self, qe_targets)
+        tdw_weights = tdw_weights.view(B, T)
+        weights = weights.view(B, T)
+        qe_loss, qe_masked_td_error, _ = calc_mse_loss(
+            qe_q_values.squeeze(2), qe_targets.detach(), seq_mask, weights=tdw_weights * weights
+        )
 
         # Qi objective
         q_values = torch.gather(mac_out[:, :-1], dim=2, index=actions.unsqueeze(2)).squeeze(2)
         qe_bar_q_values = torch.gather(aux_target_mac_out[:, :-1], dim=2, index=actions.unsqueeze(2)).squeeze(2)
-        # get weights
-        td_error = (qe_bar_q_values - q_values).detach()
-        # weights of samples
-        B, T = obs.shape[:2]
-        td_error_detached = td_error.detach()
-        wts_x = torch.cat([
-            td_error.view(B, T, -1),
-            timesteps.view(B, T, -1),
-            exp_factor.view(B, T, -1),
-            # obs.view(B, T, -1),
-            # next_obs.view(B, T, -1),
-            # rewards.view(B, T, -1),
-            # actions.view(B, T, -1),
-        ], dim=-1).float()
-        weights = utils.unroll_mac(self.weight_model, wts_x).squeeze(2)
-        wts_targets = torch.where(
-            td_error_detached < 0., self.algo_config.beta, self.algo_config.alpha
+        weights = torch.where(qe_bar_q_values > q_values, 1.0, algo_config.lamda)
+        qi_loss, masked_td_error, seq_mask_sum = calc_mse_loss(
+            q_values, qe_bar_q_values.detach(), seq_mask, weights
         )
-        wts_loss = utils.huber_loss_with_sigma(weights, wts_targets, sigma=0.2)
-        qi_loss, masked_td_error, seq_mask_sum = calc_mse_loss(q_values, qe_bar_q_values.detach(), seq_mask, weights.detach())
 
         # aggregate the two objectives
-        wts_loss = (wts_loss * seq_mask).sum() / seq_mask_sum
-        loss = qi_loss + qe_loss + wts_loss
+        loss = qi_loss + qe_loss
 
         # optimization
         self.optimizer.zero_grad()
@@ -244,7 +239,7 @@ class WBQLPolicy(Policy):
             metrics.LearningMetrics.TD_ERROR_ABS: masked_td_error.abs().sum().item() / mask_elems,
             metrics.LearningMetrics.Q_TAKEN_MEAN: (q_values * seq_mask).sum().item() / mask_elems,
             metrics.LearningMetrics.TARGET_MEAN: (qe_bar_q_values * seq_mask).sum().item() / mask_elems,
-            constants.TD_ERRORS: utils.tensor_to_numpy(td_error)
+            constants.TD_ERRORS: utils.tensor_to_numpy(qe_masked_td_error)
         }
 
     def vae_loss_function(self, recon_x, x, mu, logvar):
