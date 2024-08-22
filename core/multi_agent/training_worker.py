@@ -60,7 +60,8 @@ class MultiAgentIndependentTrainingWorker(TrainingWorker):
                 kwargs = {constants.EVAL_SAMPLE_BATCH: eval_sample_batch}
 
             # Train using samples
-            learning_stats = policy.learn(samples, **kwargs)
+            for _ in range(10):
+                learning_stats = policy.learn(samples, **kwargs)
             td_errors = learning_stats.pop(constants.TD_ERRORS)
             ma_td_errors.append(td_errors)
 

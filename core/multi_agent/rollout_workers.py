@@ -101,7 +101,6 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
                 agent_data = None
             data[policy_id] = agent_data
         return data
-
     def generate_trajectory(self):
         self._cur_iter += 1
         raw_obs, info = self.env.reset()
@@ -186,7 +185,6 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
             action_mask = self.unpack_env_data(raw_obs, constants.ACTION_MASK)
             done = False
             episode_len = 0
-            episode_reward = 0
             episode = Episode()
             prev_act = collections.defaultdict(int)
             prev_hidden_states = {}
@@ -233,10 +231,9 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
                 # update episode metrics
                 episode_len += 1
                 rewards_list = list(results[constants.REWARD].values())
-                episode_reward += sum(rewards_list)
+                eval_episode_rewards.append(sum(rewards_list))
 
             eval_episode_lens.append(episode_len)
-            eval_episode_rewards.append(episode_reward)
             eval_episodes.append(episode)
 
         episode_reward_mean = np.mean(eval_episode_rewards)

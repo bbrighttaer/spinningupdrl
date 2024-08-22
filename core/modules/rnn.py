@@ -121,7 +121,7 @@ class WeightNetRNN(SimpleRNN):
             nn.BatchNorm1d(self.model_config.hidden_state_dim),
             activation(),
             nn.Linear(self.model_config.hidden_state_dim, 1),
-            nn.Sigmoid()
+            nn.Softplus()  # Ensure non-negative output
         )
 
     # def forward(self, input_obs, hidden_state, **kwargs):

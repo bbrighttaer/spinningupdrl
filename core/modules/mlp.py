@@ -51,7 +51,9 @@ class WeightNetMLP(TorchModel):
 
         layers = []
         activation = utils.get_activation_function(self.model_config.activation)
-        input_dim = self.fp_dim
+        act_emb = 5
+        self.act_emb_table = nn.Embedding(self.action_dim, act_emb)
+        input_dim = 1 + self.obs_dim + act_emb
 
         # create hidden layers
         for dim in self.model_config.hidden_layers:
@@ -64,7 +66,7 @@ class WeightNetMLP(TorchModel):
         # output layer
         layers.extend([
             nn.Linear(input_dim, 1),
-            nn.Sigmoid()
+            nn.Softplus()  # Ensure non-negative output
         ])
 
         # create model

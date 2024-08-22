@@ -4,6 +4,7 @@ import numpy as np
 import torch
 
 from algos import Policy
+from algos.multi_agent.importance_estimation import ImportanceEstimation
 from algos.policy import LearningStats
 from core import constants, utils, EPS, metrics
 from core.buffer import sample_batch
@@ -12,13 +13,35 @@ from core.modules.mlp import SimpleFCNet
 from core.modules.rnn import SimpleRNN, WeightNetRNN
 
 
-class WIQLPolicy(Policy):
+def extract_exp_attrs(samples, device):
+    # set a get interceptor to convert values to tensor on retrieval
+    samples.set_get_interceptor(partial(utils.convert_to_tensor, device=device))
+    obs = samples[constants.OBS]
+    actions = samples[constants.ACTION]
+    rewards = samples[constants.REWARD]
+    rewards = rewards.float()
+    next_obs = samples[constants.NEXT_OBS]
+    dones = samples[constants.DONE].long()
+    weights = samples[constants.WEIGHTS]
+    timesteps = samples[constants.TIMESTEP]
+    exp_factor = samples[constants.EXPLORATION_FACTOR]
+    seq_mask = (~samples[constants.SEQ_MASK]).long()
+    if constants.NEXT_ACTION_MASK in samples:
+        next_action_mask = samples[constants.NEXT_ACTION_MASK]
+    else:
+        next_action_mask = None
+    return obs, actions, rewards, next_obs, dones, weights, timesteps, exp_factor, seq_mask, next_action_mask
+
+
+class WIQLPolicy(Policy, ImportanceEstimation):
     """
     Multi-Agent Weighted DQN Policy
     """
 
     def __init__(self, config, summary_writer, logger, policy_id=None):
-        super().__init__(config, summary_writer, logger, policy_id)
+        Policy.__init__(self, config, summary_writer, logger, policy_id)
+        ImportanceEstimation.__init__(self)
+
         # create model
         if self.model_config.core_arch == "mlp":
             self.model = SimpleFCNet(self.model_config).to(self.device)
@@ -29,16 +52,11 @@ class WIQLPolicy(Policy):
         else:
             raise RuntimeError("Core arch should be either gru or mlp")
 
-        # Weight model
-        self.model_config.fp_size = 5
-        self.weight_model = WeightNetRNN(self.model_config).to(self.device)
-
         # create optimizers
-        self.params = list(self.model.parameters()) + list(self.weight_model.parameters())
+        self.params = list(self.model.parameters())
         if self.algo_config.optimizer == "rmsprop":
             from torch.optim import RMSprop
             self.optimizer = RMSprop(params=self.params, lr=self.algo_config.learning_rate)
-            self.wts_optimizer = RMSprop(params=self.weight_model.parameters(), lr=self.algo_config.learning_rate)
         elif self.algo_config.optimizer == "adam":
             from torch.optim import Adam
             self.optimizer = Adam(params=self.params, lr=self.algo_config.learning_rate)
@@ -122,27 +140,88 @@ class WIQLPolicy(Policy):
         self._training_count += 1
         algo_config = self.config[constants.ALGO_CONFIG]
 
-        # set a get interceptor to convert values to tensor on retrieval
-        samples.set_get_interceptor(partial(utils.convert_to_tensor, device=self.device))
-
         # training data
-        obs = samples[constants.OBS]
-        actions = samples[constants.ACTION]
-        rewards = samples[constants.REWARD]
-        rewards = rewards.float()
-        next_obs = samples[constants.NEXT_OBS]
-        dones = samples[constants.DONE].long()
-        timesteps = samples[constants.TIMESTEP]
-        exp_factor = samples[constants.EXPLORATION_FACTOR]
-        seq_mask = (~samples[constants.SEQ_MASK]).long()
-        if constants.NEXT_ACTION_MASK in samples:
-            next_action_mask = samples[constants.NEXT_ACTION_MASK]
-        else:
-            next_action_mask = None
+        (obs, actions, rewards, next_obs, dones, weights,
+         timesteps, exp_factor, seq_mask, next_action_mask) = extract_exp_attrs(samples, self.device)
+        B, T = obs.shape[:2]
+
+        # q-learning objective
+        masked_td_error, q_values, targets, td_error = self.compute_ql_objective(
+            obs, actions, rewards, next_obs, dones, next_action_mask, seq_mask
+        )
+
+        # weights of samples
+        if constants.EVAL_SAMPLE_BATCH in kwargs:
+            # train data
+            wts_x_train = torch.cat([
+                td_error.detach().view(B * T, -1),
+                obs.view(B * T, -1),
+                actions.view(B * T, -1),
+            ], dim=-1).float()
+
+            # eval data
+            eval_samples = kwargs[constants.EVAL_SAMPLE_BATCH]
+            (ev_obs, ev_actions, ev_rewards, ev_next_obs,
+             ev_dones, ev_weights, ev_timesteps, ev_exp_factor,
+             ev_seq_mask, ev_next_action_mask) = extract_exp_attrs(eval_samples, self.device)
+            ev_b, ev_t = ev_obs.shape[:2]
+
+            # q-learning objective on eval dataset
+            ev_masked_td_error, ev_q_values, ev_targets, ev_td_error = self.compute_ql_objective(
+                ev_obs, ev_actions, ev_rewards, ev_next_obs, ev_dones, ev_next_action_mask, ev_seq_mask
+            )
+            ev_td_error = ev_td_error.view(ev_b * ev_t, -1)
+            eval_mask = ev_td_error > 0
+            ev_td_error_sub = ev_td_error.detach()[eval_mask]
+            ev_obs_sub = ev_obs.view(ev_b * ev_t, -1)[eval_mask]
+            ev_actions_sub = ev_actions.view(ev_b * ev_t, -1)[eval_mask]
+            ev_seq_mask = ev_seq_mask.view(ev_b * ev_t, -1)[eval_mask]
+            wts_x_test = torch.cat([ev_td_error_sub, ev_obs_sub, ev_actions_sub], dim=-1).float()
+
+            # update weights net
+            if len(wts_x_test) > 0:
+                wts_loss = self.update_weights_model(
+                    x_train=wts_x_train,
+                    x_test=wts_x_test,
+                    q_vals=q_values.detach().view(B * T, -1),
+                    seq_mask_train=seq_mask.view(B * T, -1),
+                    seq_mask_test=ev_seq_mask,
+                )
+                wts = self.get_estimated_weights(wts_x_train)
+                weights *= wts
+
+        # loss computation
+        loss = weights * masked_td_error ** 2
+        seq_mask_sum = seq_mask.sum()
+        loss = loss.sum() / seq_mask_sum
+
+        # optimization
+        self.optimizer.zero_grad()
+        loss.backward()
+        grad_norm_clipping_ = algo_config.grad_clip
+        grad_norm = torch.nn.utils.clip_grad_norm_(self.params, grad_norm_clipping_)
+        self.optimizer.step()
+
+        # target model update
+        if (self._training_count % algo_config.target_update_freq) == 0:
+            self.update_target()
+
+        # metrics gathering
+        mask_elems = seq_mask_sum.item()
+        return {
+            metrics.LearningMetrics.TRAINING_LOSS: loss.item(),
+            metrics.LearningMetrics.GRAD_NORM: grad_norm if isinstance(grad_norm, float) else grad_norm.item(),
+            metrics.LearningMetrics.TD_ERROR_ABS: masked_td_error.abs().sum().item() / mask_elems,
+            metrics.LearningMetrics.Q_TAKEN_MEAN: (q_values * seq_mask).sum().item() / mask_elems,
+            metrics.LearningMetrics.TARGET_MEAN: (targets * seq_mask).sum().item() / mask_elems,
+            constants.TD_ERRORS: utils.tensor_to_numpy(td_error)
+        }
+
+    def compute_ql_objective(self, obs, actions, rewards, next_obs, dones, next_action_mask, seq_mask):
         B, T = obs.shape[:2]
 
         # reward normalization
-        if algo_config.reward_normalization:
+        if self.algo_config.reward_normalization:
             rewards = (rewards - rewards.mean()) / (rewards.std() + EPS)
 
         # put all observations together for convenience
@@ -157,6 +236,7 @@ class WIQLPolicy(Policy):
 
         # target model q-values
         target_mac_out_tp1 = target_mac_out[:, 1:]
+
         # if action mask is present avoid selecting these actions
         if self.action_mask_size > 0 and next_action_mask is not None:
             ignore_action_tp1 = (next_action_mask.view(B, T, -1) == 0) & (seq_mask.view(B, T, -1) == 1)
@@ -164,59 +244,14 @@ class WIQLPolicy(Policy):
         target_q_values = torch.max(target_mac_out_tp1, dim=2)[0]
 
         # compute targets
-        targets = rewards + (1 - dones) * algo_config.gamma * target_q_values
+        targets = rewards + (1 - dones) * self.algo_config.gamma * target_q_values
         targets = targets.detach()
 
         # one step TD error
         td_error = targets - q_values
         masked_td_error = seq_mask * td_error
 
-        # weights of samples
-        td_error_detached = td_error.detach()
-        wts_x = torch.cat([
-            targets.view(B, T, -1),
-            q_values.detach().view(B, T, -1),
-            timesteps.view(B, T, -1),
-            exp_factor.view(B, T, -1),
-            obs.view(B, T, -1),
-            next_obs.view(B, T, -1),
-            rewards.view(B, T, -1),
-            actions.view(B, T, -1),
-        ], dim=-1).float()
-        weights = utils.unroll_mac(self.weight_model, wts_x).squeeze(2)
-        wts_targets = torch.where(
-            td_error_detached < 0., self.algo_config.beta, self.algo_config.alpha
-        )
-        wts_loss = utils.huber_loss_with_sigma(weights, wts_targets, sigma=0.1)
-
-        # loss computation
-        loss = weights.detach() * masked_td_error ** 2
-        seq_mask_sum = seq_mask.sum()
-        loss = loss.sum() / seq_mask_sum
-        wts_loss = (wts_loss * seq_mask).sum() / seq_mask_sum
-        loss += wts_loss
-
-        # optimization
-        self.optimizer.zero_grad()
-        loss.backward()
-        grad_norm_clipping_ = algo_config.grad_clip
-        grad_norm = torch.nn.utils.clip_grad_norm_(self.params, grad_norm_clipping_)
-        self.optimizer.step()
-
-        # target model update
-        if self._training_count > algo_config.target_update_freq + self._last_target_update:
-            self.update_target()
-            self._last_target_update = self._training_count
-
-        # metrics gathering
-        mask_elems = seq_mask_sum.item()
-        return {
-            metrics.LearningMetrics.TRAINING_LOSS: loss.item(),
-            metrics.LearningMetrics.GRAD_NORM: grad_norm if isinstance(grad_norm, float) else grad_norm.item(),
-            metrics.LearningMetrics.TD_ERROR_ABS: masked_td_error.abs().sum().item() / mask_elems,
-            metrics.LearningMetrics.Q_TAKEN_MEAN: (q_values * seq_mask).sum().item() / mask_elems,
-            metrics.LearningMetrics.TARGET_MEAN: (targets * seq_mask).sum().item() / mask_elems,
-        }
+        return masked_td_error, q_values, targets, td_error
 
 
 

@@ -23,11 +23,6 @@ ALGO_CONFIG = {
     "grad_clip": 10,
     "tau": 0.5,
     "lamda": 0.1,
-    "tdw_schedule": [
-        [0, 1.0],
-        [50000, 1.0],
-        [60000, 0.0],
-    ],
     "reward_normalization": False,
     "show_reward_dist": True,
     "comm_size": 0,  # size or dimension of a message (if communication is enabled)
