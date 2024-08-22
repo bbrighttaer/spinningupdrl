@@ -88,7 +88,7 @@ class Policy(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def learn(self, samples: sample_batch.SampleBatch) -> LearningStats:
+    def learn(self, samples: sample_batch.SampleBatch, **kwargs) -> LearningStats:
         ...
 
     @abc.abstractmethod

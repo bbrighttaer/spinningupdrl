@@ -12,6 +12,9 @@ import numpy as np
 import torch.nn
 import torch.nn.functional as F
 
+from core import constants
+from core.buffer.sample_batch import SampleBatch
+
 
 class DotDic(dict):
     """dot.notation for dictionary attributes"""
@@ -243,3 +246,41 @@ def huber_loss_with_sigma(y_pred, y_true, sigma=0.5):
     # loss = torch.where(error <= sigma, torch.tensor(0.0), 0.5 * (error - sigma)**2)
     loss = torch.where(error <= sigma, torch.tensor(0.0), F.huber_loss(y_pred, y_true, reduction='none'))
     return loss
+
+
+def create_sample_batch(sampled_episodes, weights, batch_indexes, max_len):
+    # padding
+    padded_sample_episodes = []
+    weights_padded = []
+    seq_lens = []
+    for i, episode in enumerate(sampled_episodes):
+        ep_len = len(episode)
+        pad_size = max_len - ep_len
+        episode_padded = episode.pad_episode(pad_size)
+        padded_sample_episodes.append(episode_padded)
+        weights_padded.append(
+            weights[i] + [0.] * pad_size
+        )
+        seq_lens.append(ep_len)
+    sample_batch = SampleBatch(batch=padded_sample_episodes)
+    sample_batch[constants.WEIGHTS] = np.array(weights_padded)
+    sample_batch[constants.BATCH_INDEXES] = np.array(batch_indexes)
+    sample_batch[constants.SEQ_LENS] = np.array(seq_lens)
+    return sample_batch
+
+
+def convert_eval_episodes_to_sample_batch(episodes):
+    if len(episodes) == 0:
+        return []
+
+    # create dummy elements
+    batch_indexes = []
+    weights = []
+    max_len = 0
+    for i, ep in enumerate(episodes):
+        traj_len = len(ep)
+        max_len = max(traj_len, max_len)
+        batch_indexes.append(i)
+        weights.append([1.] * traj_len)
+    sample_batch = create_sample_batch(episodes, weights, batch_indexes, max_len)
+    return sample_batch

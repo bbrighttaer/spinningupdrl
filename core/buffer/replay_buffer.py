@@ -11,6 +11,7 @@ from core.buffer.segment_tree import SumSegmentTree, MinSegmentTree
 from core.proto.episode_proto import Episode
 from core.proto.replay_buffer_proto import ReplayBuffer as ReplayBufferProto
 from core.schedules.piecewise_schedule import PiecewiseSchedule
+from core.utils import create_sample_batch
 
 
 class ReplayBuffer(ReplayBufferProto):
@@ -60,23 +61,7 @@ class ReplayBuffer(ReplayBufferProto):
             batch_indexes.extend([idx] * count)
             self._num_timesteps_sampled += count
 
-        padded_sample_episodes = []
-        weights_padded = []
-        seq_lens = []
-        for i, episode in enumerate(sampled_episodes):
-            ep_len = len(episode)
-            pad_size = max_len - ep_len
-            episode_padded = episode.pad_episode(pad_size)
-            padded_sample_episodes.append(episode_padded)
-            weights_padded.append(
-                weights[i] + [0.] * pad_size
-            )
-            seq_lens.append(ep_len)
-
-        sample_batch = SampleBatch(batch=padded_sample_episodes)
-        sample_batch[constants.WEIGHTS] = np.array(weights_padded)
-        sample_batch[constants.BATCH_INDEXES] = np.array(batch_indexes)
-        sample_batch[constants.SEQ_LENS] = np.array(seq_lens)
+        sample_batch = create_sample_batch(sampled_episodes, weights, batch_indexes, max_len)
         return sample_batch
 
     def __len__(self):
@@ -169,24 +154,7 @@ class PrioritizedExperienceReplayBuffer(ReplayBufferProto):
             batch_indexes.extend([idx] * count)
             self._num_timesteps_sampled += count
 
-        # padding
-        padded_sample_episodes = []
-        weights_padded = []
-        seq_lens = []
-        for i, episode in enumerate(sampled_episodes):
-            ep_len = len(episode)
-            pad_size = max_len - ep_len
-            episode_padded = episode.pad_episode(pad_size)
-            padded_sample_episodes.append(episode_padded)
-            weights_padded.append(
-                weights[i] + [0.] * pad_size
-            )
-            seq_lens.append(ep_len)
-
-        sample_batch = SampleBatch(batch=padded_sample_episodes)
-        sample_batch[constants.WEIGHTS] = np.array(weights_padded)
-        sample_batch[constants.BATCH_INDEXES] = np.array(batch_indexes)
-        sample_batch[constants.SEQ_LENS] = np.array(seq_lens)
+        sample_batch = create_sample_batch(sampled_episodes, weights, batch_indexes, max_len)
         return sample_batch
 
     def on_learning_completed(self, *args, **kwargs):

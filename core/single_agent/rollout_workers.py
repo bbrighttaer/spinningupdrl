@@ -115,8 +115,10 @@ class SimpleRolloutWorker(RolloutWorker):
     def evaluate_policy(self, num_episodes: int, render=False):
         eval_episode_lens = []
         eval_episode_rewards = []
+        eval_episodes = []
 
         for i in range(num_episodes):
+            episode = Episode()
             obs, info = self.env.reset()
             state = info.get("state")
             done = False
@@ -140,6 +142,24 @@ class SimpleRolloutWorker(RolloutWorker):
                 done = done or truncated
                 episode_reward += reward
 
+                # add timestep record to episode/trajectory
+                next_state = info.get(constants.NEXT_STATE)
+                experience = {
+                    constants.OBS: obs,
+                    constants.ACTION: action,
+                    constants.REWARD: reward,
+                    constants.NEXT_OBS: next_obs,
+                    constants.DONE: done,
+                    constants.PREV_ACTION: prev_act,
+                    constants.SEQ_MASK: False,
+                }
+                if state is not None and next_state is not None:
+                    experience.update({
+                        constants.STATE: state,
+                        constants.NEXT_STATE: next_state,
+                    })
+                episode.add(**experience)
+
                 # timestep props update
                 obs = next_obs
                 state = info.get("state")
@@ -150,6 +170,7 @@ class SimpleRolloutWorker(RolloutWorker):
 
             eval_episode_lens.append(episode_len)
             eval_episode_rewards.append(episode_reward)
+            eval_episodes.append(episode)
 
         episode_reward_mean = np.mean(eval_episode_rewards)
 
@@ -164,4 +185,4 @@ class SimpleRolloutWorker(RolloutWorker):
         )
 
         # return flag for terminating the trial if target has been reached
-        return self.config[constants.RUNNING_CONFIG].episode_reward_mean_goal <= episode_reward_mean
+        return self.config[constants.RUNNING_CONFIG].episode_reward_mean_goal <= episode_reward_mean, eval_episodes

@@ -117,7 +117,7 @@ class WIQLPolicy(Policy):
 
         return action, [utils.tensor_to_numpy(h) for h in hidden_states]
 
-    def learn(self, samples: sample_batch.SampleBatch) -> LearningStats:
+    def learn(self, samples: sample_batch.SampleBatch, **kwargs) -> LearningStats:
         self.model.train()
         self._training_count += 1
         algo_config = self.config[constants.ALGO_CONFIG]

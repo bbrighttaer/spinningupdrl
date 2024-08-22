@@ -36,6 +36,7 @@ TD_ERRORS = "td_errors"
 WEIGHTS = "weights"
 BATCH_INDEXES = "batch_indexes"
 SEQ_LENS = "seq_lens"
+EVAL_SAMPLE_BATCH = "eval_samples"
 
 # Experiment modes
 SINGLE_AGENT = "sa"

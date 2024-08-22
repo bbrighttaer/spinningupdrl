@@ -22,6 +22,30 @@ def RolloutWorkerCreator(
     )
 
 
+def _get_experience_attributes():
+    # list of experience elements
+    experience_attributes = [
+        constants.OBS,
+        constants.STATE,
+        constants.ACTION_MASK,
+        constants.ACTION,
+        constants.REWARD,
+        constants.NEXT_OBS,
+        constants.NEXT_STATE,
+        constants.NEXT_ACTION_MASK,
+        constants.DONE,
+        constants.PREV_ACTION,
+        constants.SENT_MESSAGE,
+        constants.NEXT_SENT_MESSAGE,
+        constants.RECEIVED_MESSAGE,
+        constants.NEXT_RECEIVED_MESSAGE,
+        constants.TIMESTEP,
+        constants.EXPLORATION_FACTOR,
+        constants.SEQ_MASK,
+    ]
+    return experience_attributes
+
+
 class SimpleMultiAgentRolloutWorker(RolloutWorker):
 
     def __init__(self,
@@ -96,26 +120,7 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
             prev_hidden_states[policy_id] = policy.get_initial_hidden_state()
             prev_messages[policy_id] = policy.get_initial_message()
 
-        # list of experience elements
-        experience_attributes = [
-            constants.OBS,
-            constants.STATE,
-            constants.ACTION_MASK,
-            constants.ACTION,
-            constants.REWARD,
-            constants.NEXT_OBS,
-            constants.NEXT_STATE,
-            constants.NEXT_ACTION_MASK,
-            constants.DONE,
-            constants.PREV_ACTION,
-            constants.SENT_MESSAGE,
-            constants.NEXT_SENT_MESSAGE,
-            constants.RECEIVED_MESSAGE,
-            constants.NEXT_RECEIVED_MESSAGE,
-            constants.TIMESTEP,
-            constants.EXPLORATION_FACTOR,
-            constants.SEQ_MASK,
-        ]
+        experience_attributes = _get_experience_attributes()
 
         # Run for an episode
         while not done and episode_len < self.config[constants.RUNNING_CONFIG].max_timesteps_per_episode:
@@ -171,6 +176,8 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
     def evaluate_policy(self, num_episodes: int, render=False):
         eval_episode_lens = []
         eval_episode_rewards = []
+        experience_attributes = _get_experience_attributes()
+        eval_episodes = []
 
         for i in range(num_episodes):
             raw_obs, info = self.env.reset()
@@ -180,6 +187,7 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
             done = False
             episode_len = 0
             episode_reward = 0
+            episode = Episode()
             prev_act = collections.defaultdict(int)
             prev_hidden_states = {}
             prev_messages = {}
@@ -205,6 +213,14 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
                     explore=False
                 )
 
+                # add timestep record to episode/trajectory of each agent/policy
+                experience = {
+                    exp_attr: [
+                        results[exp_attr][policy_id] for policy_id in self.policies
+                    ] for exp_attr in experience_attributes
+                }
+                episode.add(**experience)
+
                 # timestep props update
                 obs = results[constants.NEXT_OBS]
                 state = results[constants.NEXT_STATE]
@@ -221,6 +237,7 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
 
             eval_episode_lens.append(episode_len)
             eval_episode_rewards.append(episode_reward)
+            eval_episodes.append(episode)
 
         episode_reward_mean = np.mean(eval_episode_rewards)
 
@@ -235,4 +252,4 @@ class SimpleMultiAgentRolloutWorker(RolloutWorker):
         )
 
         # return flag for terminating the trial if target has been reached
-        return self.config[constants.RUNNING_CONFIG].episode_reward_mean_goal <= episode_reward_mean
+        return self.config[constants.RUNNING_CONFIG].episode_reward_mean_goal <= episode_reward_mean, eval_episodes

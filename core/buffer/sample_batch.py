@@ -27,8 +27,16 @@ class SampleBatch(dict):
         self._interceptor = interceptor
 
     def slice_multi_agent_batch(self, i):
+        """
+        Selects the samples of agent i along the agent axis.
+        This assumes that each key in the multi-agent batch is structured as [N, T, num_agents,...].
+        Keys whose values cannot be sliced (due to being common across agents) are left as is.
+
+        :param i: agent index
+        :return: sample batch for a single agent
+        """
         return SampleBatch({
-            k: v[:, :, i] for k, v in self.items()
+            k: v[:, :, i] if v.ndim > 2 else v for k, v in self.items()
         })
 
     def __len__(self):

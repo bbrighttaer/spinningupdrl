@@ -3,7 +3,7 @@ import typing
 import numpy as np
 
 from algos import Policy
-from core import constants
+from core import constants, utils
 from core.proto.replay_buffer_proto import ReplayBuffer
 from core.proto.training_worker_proto import TrainingWorker
 
@@ -26,7 +26,7 @@ class MultiAgentIndependentTrainingWorker(TrainingWorker):
         self.logger = logger
         self.callback = callback
 
-    def train(self, timestep: int, cur_iter: int):
+    def train(self, timestep: int, cur_iter: int, eval_episodes: list):
         algo_config = self.config[constants.ALGO_CONFIG]
 
         # Train after `num_steps_to_training` timesteps
@@ -36,19 +36,8 @@ class MultiAgentIndependentTrainingWorker(TrainingWorker):
         # Sample a batch from the buffer
         multi_agent_samples = self.replay_buffer.sample(algo_config.training_batch_size, timestep)
 
-        # pop out keys that cannot be sliced for each agent
-        if constants.WEIGHTS in multi_agent_samples:
-            weights = multi_agent_samples.pop(constants.WEIGHTS)
-        else:
-            weights = []
-        if constants.BATCH_INDEXES in multi_agent_samples:
-            batch_indexes = multi_agent_samples.pop(constants.BATCH_INDEXES)
-        else:
-            batch_indexes = []
-        if constants.SEQ_LENS in multi_agent_samples:
-            seq_lens = multi_agent_samples.pop(constants.SEQ_LENS)
-        else:
-            seq_lens = []
+        # construct sample batch from eval episodes
+        multi_agent_eval_sample_batch = utils.convert_eval_episodes_to_sample_batch(eval_episodes)
 
         # gather returned td errors
         ma_td_errors = []
@@ -57,10 +46,13 @@ class MultiAgentIndependentTrainingWorker(TrainingWorker):
         for i, policy_id in enumerate(self.policies):
             policy = self.policies[policy_id]
             samples = multi_agent_samples.slice_multi_agent_batch(i)
-            samples[constants.WEIGHTS] = weights
+            kwargs = {}
+            if multi_agent_eval_sample_batch:
+                eval_sample_batch = multi_agent_eval_sample_batch.slice_multi_agent_batch(i)
+                kwargs = {constants.EVAL_SAMPLE_BATCH: eval_sample_batch}
 
             # Train using samples
-            learning_stats = policy.learn(samples)
+            learning_stats = policy.learn(samples, **kwargs)
             td_errors = learning_stats.pop(constants.TD_ERRORS)
             ma_td_errors.append(td_errors)
 
@@ -73,8 +65,6 @@ class MultiAgentIndependentTrainingWorker(TrainingWorker):
                 label_suffix=policy_id
             )
         ma_td_errors = np.stack(ma_td_errors)
-        multi_agent_samples[constants.BATCH_INDEXES] = batch_indexes
-        multi_agent_samples[constants.SEQ_LENS] = seq_lens
         kwargs = {
             constants.TD_ERRORS: ma_td_errors,
             "sample_batch": multi_agent_samples,

@@ -146,15 +146,16 @@ class Runner:
         while rollout_worker.timestep < running_config.total_timesteps and not early_stopping:
             # check for evaluation step
             timestep = rollout_worker.timestep
+            eval_episodes = []
             if timestep > (running_config.evaluation_interval + last_eval_step):
-                early_stopping = rollout_worker.evaluate_policy(running_config.evaluation_num_episodes)
+                early_stopping, eval_episodes = rollout_worker.evaluate_policy(running_config.evaluation_num_episodes)
                 last_eval_step = timestep
 
             # generate an episode
             rollout_worker.generate_trajectory()
 
             # training
-            training_worker.train(timestep, rollout_worker.cur_iter)
+            training_worker.train(timestep, rollout_worker.cur_iter, eval_episodes)
 
             # checkpoint
             if timestep > (running_config.checkpoint_freq + last_checkpoint_ts):

@@ -56,7 +56,7 @@ class Episode(EpisodeProto):
 
     def merge_time_steps(self) -> 'Episode':
         """
-        Merge all episode steps into a single into a single batch.
+        Merge all episode steps into a single batch.
 
         :return: Episode with a single batch entry for each property.
         """

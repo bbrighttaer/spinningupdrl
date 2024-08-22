@@ -17,7 +17,7 @@ class SingleAgentTrainingWorker(TrainingWorker):
         self.logger = logger
         self.callback = callback
 
-    def train(self, timestep: int, cur_iter: int):
+    def train(self, timestep: int, cur_iter: int, eval_episodes: list):
         algo_config = self.config[constants.ALGO_CONFIG]
 
         # Train after `num_steps_to_training` timesteps
