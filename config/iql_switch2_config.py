@@ -27,8 +27,8 @@ ALGO_CONFIG = {
 }
 MODEL_CONFIG = {
     "core_arch": "rnn",
-    "encoder_layers": [128],
-    "hidden_state_dim": 128,
+    "encoder_layers": [64],
+    "hidden_state_dim": 64,
     "hidden_layers": [64],
     "embedding_dim": 8,
     "num_rnn_layers": 1,
@@ -36,5 +36,5 @@ MODEL_CONFIG = {
     "dropout_rate": 0.,
 }
 ENV_CONFIG = {
-    "id": "Switch2-v0"
+    "id": "Switch2-v1"
 }
