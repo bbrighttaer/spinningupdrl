@@ -104,7 +104,7 @@ class Runner:
             )
 
             # start execution
-            self._running_loop(policy, rollout_worker, config, training_worker, working_dir)
+            self._running_loop(policy, rollout_worker, config, training_worker, working_dir, summary_writer)
 
         elif self.cmd_args.mode == constants.MULTI_AGENT:
             # create policies using PolicyCreator
@@ -123,7 +123,7 @@ class Runner:
             )
 
             # start execution
-            self._running_loop(policies, rollout_worker, config, training_worker, working_dir)
+            self._running_loop(policies, rollout_worker, config, training_worker, working_dir, summary_writer)
 
         elif self.cmd_args.mode == constants.MULTI_AGENT_WITH_PARAMETER_SHARING:
             ...
@@ -131,7 +131,7 @@ class Runner:
         logger.info(f"Total time elapsed is {time.perf_counter() - start_time} seconds")
         summary_writer.close()
 
-    def _running_loop(self, policy, rollout_worker, config, training_worker, working_dir):
+    def _running_loop(self, policy, rollout_worker, config, training_worker, working_dir, sm):
         # check if policy rendering is activated
         if self.cmd_args.render_dir is not None:
             self.render(config, policy, rollout_worker)
@@ -144,24 +144,35 @@ class Runner:
         checkpoint_count = 0
         early_stopping = False
         while rollout_worker.timestep < running_config.total_timesteps and not early_stopping:
+            s0 = time.perf_counter()
+            duration_stats = {}
             # check for evaluation step
             timestep = rollout_worker.timestep
             eval_episodes = []
             if timestep > (running_config.evaluation_interval + last_eval_step):
+                s1 = time.perf_counter()
                 early_stopping, eval_episodes = rollout_worker.evaluate_policy(running_config.evaluation_num_episodes)
                 last_eval_step = timestep
+                duration_stats["evaluation_time"] = time.perf_counter() - s1
 
             # generate an episode
+            s2 = time.perf_counter()
             rollout_worker.generate_trajectory()
+            duration_stats["rollout_time"] = time.perf_counter() - s2
 
             # training
-            training_worker.train(timestep, rollout_worker.cur_iter, eval_episodes)
+            stats = training_worker.train(timestep, rollout_worker.cur_iter, eval_episodes)
+            if stats:
+                duration_stats.update(stats)
 
             # checkpoint
             if timestep > (running_config.checkpoint_freq + last_checkpoint_ts):
                 checkpoint_count += 1
                 last_checkpoint_ts = timestep
                 utils.save_policy_weights(policy, working_dir, checkpoint_count)
+
+            duration_stats["iteration_time"] = time.perf_counter() - s0
+            sm.add_scalars("training/time_stats", duration_stats, timestep)
 
         # completion protocol
         rollout_worker.evaluate_policy(running_config.evaluation_num_episodes)
